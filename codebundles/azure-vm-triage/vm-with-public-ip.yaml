@@ -1,0 +1,8 @@
+policies:
+  - name: vm-with-public-ip
+    resource: azure.vm
+    filters:
+      - type: network-interface
+        key: 'properties.ipConfigurations[].properties.publicIPAddress.id'
+        value: not-null
+      # - type: instance-view
