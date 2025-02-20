@@ -21,9 +21,6 @@ List VMs With Public IP In Azure Subscription `${AZURE_SUBSCRIPTION_ID}`
     [Tags]    VM    Azure    Network    Security
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-triage ${CURDIR}/vm-with-public-ip.yaml --cache-period 0
-    ...    secret__azure_credentials=${azure_credentials}
-    # ...    secret__azure_client_secret=${AZURE_CLIENT_SECRET}
-    # ...    env=${env}
     ${report_data}=    RW.CLI.Run Cli
     ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-triage/vm-with-public-ip/resources.json
 
@@ -63,7 +60,6 @@ Check VMs With High CPU Usage In Subscription `${AZURE_SUBSCRIPTION_ID}`
     ...    timeframe=${HIGH_CPU_TIMEFRAME}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-triage ${CURDIR}/vm-cpu-usage.yaml --cache-period 0
-    ...    secret__azure_credentials=${azure_credentials}
     ${report_data}=    RW.CLI.Run Cli
     ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-triage/vm-cpu-usage/resources.json
 
@@ -104,7 +100,6 @@ Check for Stopped VMs In Subscription `${AZURE_SUBSCRIPTION_ID}`
     ...    timeframe=${STOPPED_VM_TIMEFRAME}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-triage ${CURDIR}/stopped-vm.yaml --cache-period 0
-    ...    secret__azure_credentials=${azure_credentials}
     ${report_data}=    RW.CLI.Run Cli
     ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-triage/stopped-vms/resources.json
 

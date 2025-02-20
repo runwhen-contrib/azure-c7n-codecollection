@@ -19,7 +19,6 @@ Check for VMs With Public IP In Azure Subscription `${AZURE_SUBSCRIPTION_ID}`
     [Tags]    VM    Azure    Network    Security
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-triage ${CURDIR}/vm-with-public-ip.yaml --cache-period 0
-    ...    secret__azure_credentials=${azure_credentials}
     ${count}=    RW.CLI.Run Cli
     ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-triage/vm-with-public-ip/metadata.json | jq '.metrics[] | select(.MetricName == "ResourceCount") | .Value';
     ${vm_with_public_ip_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_VM_WITH_PUBLIC_IP}) else 0
@@ -34,7 +33,6 @@ Check for VMs With High CPU Usage In Subscription `${AZURE_SUBSCRIPTION_ID}`
     ...    timeframe=${HIGH_CPU_TIMEFRAME}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-triage ${CURDIR}/vm-cpu-usage.yaml --cache-period 0
-    ...    secret__azure_credentials=${azure_credentials}
     ${count}=    RW.CLI.Run Cli
     ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-triage/vm-cpu-usage/metadata.json | jq '.metrics[] | select(.MetricName == "ResourceCount") | .Value';
     ${cpu_usage_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_VM_WITH_HIGH_CPU}) else 0
@@ -48,7 +46,6 @@ Check for Stopped VMs In Subscription `${AZURE_SUBSCRIPTION_ID}`
     ...    timeframe=${STOPPED_VM_TIMEFRAME}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-triage ${CURDIR}/stopped-vm.yaml --cache-period 0
-    ...    secret__azure_credentials=${azure_credentials}
     ${count}=    RW.CLI.Run Cli
     ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-triage/stopped-vms/metadata.json | jq '.metrics[] | select(.MetricName == "ResourceCount") | .Value';
     ${stopped_vm_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_STOPPED_VM}) else 0
