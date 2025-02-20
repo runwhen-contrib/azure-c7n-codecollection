@@ -160,7 +160,7 @@ Suite Initialization
     ...    description=The timeframe since the VM was stopped.
     ...    pattern=^\d+$
     ...    example=24
-    ...    default=1
+    ...    default=24
     Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}    ${AZURE_SUBSCRIPTION_ID}
     Set Suite Variable    ${HIGH_CPU_PERCENTAGE}    ${HIGH_CPU_PERCENTAGE}
     Set Suite Variable    ${HIGH_CPU_TIMEFRAME}    ${HIGH_CPU_TIMEFRAME}
