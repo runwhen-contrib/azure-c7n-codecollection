@@ -14,7 +14,7 @@ Library    CloudCustodian.Core
 
 Suite Setup         Suite Initialization
 *** Tasks ***
-Check for VMs With Public IP In Azure Subscription ${AZURE_SUBSCRIPTION_ID}
+Check for VMs With Public IP In Azure Subscription `${AZURE_SUBSCRIPTION_ID}`
     [Documentation]    Lists VMs with public IP addresses in the resource group
     [Tags]    VM    Azure    Network    Security
     ${c7n_output}=    RW.CLI.Run Cli
@@ -25,7 +25,7 @@ Check for VMs With Public IP In Azure Subscription ${AZURE_SUBSCRIPTION_ID}
     ${vm_with_public_ip_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_VM_WITH_PUBLIC_IP}) else 0
     Set Global Variable    ${vm_with_public_ip_score}
 
-Check for VMs With High CPU Usage In Subscription ${AZURE_SUBSCRIPTION_ID}
+Check for VMs With High CPU Usage In Subscription `${AZURE_SUBSCRIPTION_ID}`
     [Documentation]    Checks for VMs with high CPU usage in the subscription
     [Tags]    VM    Azure    CPU    Performance
     CloudCustodian.Core.Generate Policy   
@@ -40,7 +40,7 @@ Check for VMs With High CPU Usage In Subscription ${AZURE_SUBSCRIPTION_ID}
     ${cpu_usage_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_VM_WITH_HIGH_CPU}) else 0
     Set Global Variable    ${cpu_usage_score}
 
-Check for Stopped VMs In Subscription ${AZURE_SUBSCRIPTION_ID}
+Check for Stopped VMs In Subscription `${AZURE_SUBSCRIPTION_ID}`
     [Documentation]    Count VMs that are in a stopped state in the subscription
     [Tags]    VM    Azure    State    Cost
     CloudCustodian.Core.Generate Policy   
@@ -63,10 +63,6 @@ Generate Health Score
 
 *** Keywords ***
 Suite Initialization
-    ${AZ_RESOURCE_GROUP}=    RW.Core.Import User Variable    AZ_RESOURCE_GROUP
-    ...    type=string
-    ...    description=The resource group to perform actions against.
-    ...    pattern=\w*
     ${AZURE_CLIENT_ID}=    RW.Core.Import User Variable    AZURE_CLIENT_ID
     ...    type=string
     ...    description=The azure client id to perform actions against.
@@ -129,7 +125,6 @@ Suite Initialization
     Set Suite Variable    ${AZURE_TENANT_ID}    ${AZURE_TENANT_ID}
     Set Suite Variable    ${AZURE_CLIENT_ID}    ${AZURE_CLIENT_ID}
     Set Suite Variable    ${AZURE_CLIENT_SECRET}    ${AZURE_CLIENT_SECRET}
-    Set Suite Variable    ${AZ_RESOURCE_GROUP}    ${AZ_RESOURCE_GROUP}
     Set Suite Variable    ${HIGH_CPU_PERCENTAGE}    ${HIGH_CPU_PERCENTAGE}
     Set Suite Variable    ${HIGH_CPU_TIMEFRAME}    ${HIGH_CPU_TIMEFRAME}
     Set Suite Variable    ${MAX_VM_WITH_PUBLIC_IP}    ${MAX_VM_WITH_PUBLIC_IP}
