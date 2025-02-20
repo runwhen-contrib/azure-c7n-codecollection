@@ -85,7 +85,7 @@ tasks:
           echo "Error: Missing resource_group details. Ensure Terraform plan has been applied."
           exit 1
         fi
-
+        source terraform/cb.secret
         # Generate workspaceInfo.yaml with fetched resource_group details
         cat <<EOF > workspaceInfo.yaml
         workspaceName: "$RW_WORKSPACE"
@@ -111,7 +111,7 @@ tasks:
     desc: "Run RunWhen Local Discovery on test infrastructure"
     cmds:
       - |
-        source terraform/tf.secret
+        source terraform/cb.secret
         CONTAINER_NAME="RunWhenLocal"
         if docker ps -q --filter "name=$CONTAINER_NAME" | grep -q .; then
           echo "Stopping and removing existing container $CONTAINER_NAME..."
@@ -200,7 +200,7 @@ tasks:
     cmds:
       - task: check-rwp-config
       - |
-        source terraform/tf.secret
+        source terraform/cb.secret
         BASE_DIR="output/workspaces/${RW_WORKSPACE}/slxs"
         if [ ! -d "$BASE_DIR" ]; then
           echo "Directory $BASE_DIR does not exist. Upload aborted."
@@ -260,7 +260,7 @@ tasks:
     cmds:
       - task: check-rwp-config
       - |
-        source terraform/tf.secret
+        source terraform/cb.secret
         BASE_DIR="output/workspaces/${RW_WORKSPACE}/slxs"
         if [ ! -d "$BASE_DIR" ]; then
           echo "Directory $BASE_DIR does not exist. Deletion aborted."
