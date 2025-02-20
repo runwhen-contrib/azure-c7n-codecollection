@@ -27,7 +27,7 @@ spec:
   intervalStrategy: intermezzo
   intervalSeconds: 600
   configProvided:
-    - name: AZURE_RESOURCE_SUBSCRIPTION_ID
+    - name: AZURE_SUBSCRIPTION_ID
       value: "{{ match_resource.subscription_id }}"
   secretsProvided:
   {% if wb_version %}
