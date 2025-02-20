@@ -16,7 +16,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-List VMs With Public IP In Azure Subscription ${AZURE_SUBSCRIPTION_ID}
+List VMs With Public IP In Azure Subscription `${AZURE_SUBSCRIPTION_ID}`
     [Documentation]    Lists VMs with public IP addresses in the resource group
     [Tags]    VM    Azure    Network    Security
     ${c7n_output}=    RW.CLI.Run Cli
@@ -51,10 +51,10 @@ List VMs With Public IP In Azure Subscription ${AZURE_SUBSCRIPTION_ID}
             ...    next_steps=Consider either removing the public IP address from VM `${vm['name']}` or implementing a bastion host for secure access
         END
     ELSE
-        RW.Core.Add Pre To Report    "No VMs with public IPs found in resource group `${AZ_RESOURCE_GROUP}`"
+        RW.Core.Add Pre To Report    "No VMs with public IPs found in subscription `${AZURE_SUBSCRIPTION_ID}`"
     END
 
-Check VMs With High CPU Usage In Subscription ${AZURE_SUBSCRIPTION_ID}
+Check VMs With High CPU Usage In Subscription `${AZURE_SUBSCRIPTION_ID}`
     [Documentation]    Checks for VMs with high CPU usage in the subscription
     [Tags]    VM    Azure    CPU    Performance
     CloudCustodian.Core.Generate Policy   
@@ -96,7 +96,7 @@ Check VMs With High CPU Usage In Subscription ${AZURE_SUBSCRIPTION_ID}
         RW.Core.Add Pre To Report    "No VMs with high CPU usage found in subscription `${AZURE_SUBSCRIPTION_ID}`"
     END
 
-Check for Stopped VMs In Subscription ${AZURE_SUBSCRIPTION_ID}
+Check for Stopped VMs In Subscription `${AZURE_SUBSCRIPTION_ID}`
     [Documentation]    Lists VMs that are in a stopped state in the subscription
     [Tags]    VM    Azure    State    Cost
     CloudCustodian.Core.Generate Policy   
@@ -138,10 +138,6 @@ Check for Stopped VMs In Subscription ${AZURE_SUBSCRIPTION_ID}
 
 *** Keywords ***
 Suite Initialization
-    ${AZ_RESOURCE_GROUP}=    RW.Core.Import User Variable    AZ_RESOURCE_GROUP
-    ...    type=string
-    ...    description=The resource group to perform actions against.
-    ...    pattern=\w*
     ${AZURE_CLIENT_ID}=    RW.Core.Import User Variable    AZURE_CLIENT_ID
     ...    type=string
     ...    description=The azure client id to perform actions against.
@@ -186,7 +182,6 @@ Suite Initialization
     Set Suite Variable    ${AZURE_TENANT_ID}    ${AZURE_TENANT_ID}
     Set Suite Variable    ${AZURE_CLIENT_ID}    ${AZURE_CLIENT_ID}
     Set Suite Variable    ${AZURE_CLIENT_SECRET}    ${AZURE_CLIENT_SECRET}
-    Set Suite Variable    ${AZ_RESOURCE_GROUP}    ${AZ_RESOURCE_GROUP}
     Set Suite Variable    ${HIGH_CPU_PERCENTAGE}    ${HIGH_CPU_PERCENTAGE}
     Set Suite Variable    ${HIGH_CPU_TIMEFRAME}    ${HIGH_CPU_TIMEFRAME}
     Set Suite Variable    ${STOPPED_VM_TIMEFRAME}    ${STOPPED_VM_TIMEFRAME}
