@@ -63,18 +63,6 @@ Generate Health Score
 
 *** Keywords ***
 Suite Initialization
-    ${AZURE_CLIENT_ID}=    RW.Core.Import User Variable    AZURE_CLIENT_ID
-    ...    type=string
-    ...    description=The azure client id to perform actions against.
-    ...    pattern=\w*
-    ${AZURE_CLIENT_SECRET}=    RW.Core.Import Secret    AZURE_CLIENT_SECRET
-    ...    type=string
-    ...    description=The azure client secret to perform actions against.
-    ...    pattern=\w*
-    ${AZURE_TENANT_ID}=    RW.Core.Import User Variable    AZURE_TENANT_ID
-    ...    type=string
-    ...    description=The azure tenant id to perform actions against.
-    ...    pattern=\w*
     ${azure_credentials}=    RW.Core.Import Secret
     ...    azure_credentials
     ...    type=string
@@ -122,9 +110,6 @@ Suite Initialization
     ...    example=24
     ...    default=1
     Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}    ${AZURE_SUBSCRIPTION_ID}
-    Set Suite Variable    ${AZURE_TENANT_ID}    ${AZURE_TENANT_ID}
-    Set Suite Variable    ${AZURE_CLIENT_ID}    ${AZURE_CLIENT_ID}
-    Set Suite Variable    ${AZURE_CLIENT_SECRET}    ${AZURE_CLIENT_SECRET}
     Set Suite Variable    ${HIGH_CPU_PERCENTAGE}    ${HIGH_CPU_PERCENTAGE}
     Set Suite Variable    ${HIGH_CPU_TIMEFRAME}    ${HIGH_CPU_TIMEFRAME}
     Set Suite Variable    ${MAX_VM_WITH_PUBLIC_IP}    ${MAX_VM_WITH_PUBLIC_IP}
