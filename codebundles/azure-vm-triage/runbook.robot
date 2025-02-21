@@ -16,9 +16,9 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-List VMs With Public IP In Azure Subscription `${AZURE_SUBSCRIPTION_ID}`
-    [Documentation]    Lists VMs with public IP addresses in the resource group
-    [Tags]    VM    Azure    Network    Security
+List VMs With Public IP In Azure Subscription `${AZURE_SUBSCRIPTION_NAME}`
+    [Documentation]    Lists VMs with public IP address
+    [Tags]    VM    Azure    Network    Security    access:read-only
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-triage ${CURDIR}/vm-with-public-ip.yaml --cache-period 0
     ${report_data}=    RW.CLI.Run Cli
@@ -33,27 +33,29 @@ List VMs With Public IP In Azure Subscription `${AZURE_SUBSCRIPTION_ID}`
 
     IF    len(@{vm_list}) > 0
         ${formatted_results}=    RW.CLI.Run Cli
-        ...    cmd=jq -r '["VM_Name", "Resource_Group", "Location", "Public_IP"], (.[] | [ .name, .resourceGroup, .location, (.properties.networkProfile.networkInterfaces[].properties.ipConfigurations[]?.properties.publicIPAddress?.id // "None") ]) | @tsv' ${OUTPUT_DIR}/azure-c7n-vm-triage/vm-with-public-ip/resources.json | column -t
+        ...    cmd=jq -r '["VM_Name", "Resource_Group", "Location", "VM_Link"], (.[] | [ .name, (.resourceGroup | ascii_downcase), .location, ("https://portal.azure.com/#@/resource" + .id + "/overview") ]) | @tsv' ${OUTPUT_DIR}/azure-c7n-vm-triage/vm-with-public-ip/resources.json | column -t
         RW.Core.Add Pre To Report    Virtual Machines Summary:\n===================================\n${formatted_results.stdout}
 
         FOR    ${vm}    IN    @{vm_list}
             ${pretty_vm}=    Evaluate    pprint.pformat(${vm})    modules=pprint
+            ${resource_group}=    Set Variable    ${vm['resourceGroup'].lower()}
+            ${vm_name}=    Set Variable    ${vm['name']}
             RW.Core.Add Issue
-            ...    severity=3
-            ...    expected=The VM `${vm['name']}` in resource group `${vm['resourceGroup'].lower()}` should not have a public IP address configured
-            ...    actual=The VM `${vm['name']}` in resource group `${vm['resourceGroup'].lower()}` has a public IP address configured
-            ...    title=VM with Public IP Detected: `${vm['name']}` in Resource Group `${vm['resourceGroup'].lower()}`
+            ...    severity=4
+            ...    expected=Azure VM `${vm_name}` should not be publicly accessible in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    actual=Azure VM `${vm_name}` is publicly accessible in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    title=Azure VM `${vm_name}` with Public IP Detected in Resource Group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details=${pretty_vm}
-            ...    next_steps=Consider either removing the public IP address from VM `${vm['name']}` or implementing a bastion host for secure access
+            ...    next_steps=Disable the public IP address from azure VM in subscription `${AZURE_SUBSCRIPTION_NAME}`
         END
     ELSE
-        RW.Core.Add Pre To Report    "No VMs with public IPs found in subscription `${AZURE_SUBSCRIPTION_ID}`"
+        RW.Core.Add Pre To Report    "No VMs with public IPs found in subscription `${AZURE_SUBSCRIPTION_NAME}`"
     END
 
-Check VMs With High CPU Usage In Subscription `${AZURE_SUBSCRIPTION_ID}`
-    [Documentation]    Checks for VMs with high CPU usage in the subscription
-    [Tags]    VM    Azure    CPU    Performance
+List VMs With High CPU Usage In Subscription `${AZURE_SUBSCRIPTION_NAME}`
+    [Documentation]    Checks for VMs with high CPU usage
+    [Tags]    VM    Azure    CPU    Performance    access:read-only
     CloudCustodian.Core.Generate Policy   
     ...    ${CURDIR}/vm-cpu-usage.j2
     ...    cpu_percentage=${HIGH_CPU_PERCENTAGE}
@@ -72,29 +74,31 @@ Check VMs With High CPU Usage In Subscription `${AZURE_SUBSCRIPTION_ID}`
 
     IF    len(@{vm_list}) > 0
         ${formatted_results}=    RW.CLI.Run Cli
-        ...    cmd=jq -r '["VM_Name", "Resource_Group", "Location", "CPU_Usage%", "VM_Link"], (.[] | [ .name, .resourceGroup, .location, (."c7n:metrics" | to_entries | map(.value.measurement[0]) | first // "Unknown"), ("https://portal.azure.com/#@/resource" + .id + "/overview") ]) | @tsv' ${OUTPUT_DIR}/azure-c7n-vm-triage/vm-cpu-usage/resources.json | column -t
+        ...    cmd=jq -r '["VM_Name", "Resource_Group", "Location", "CPU_Usage%", "VM_Link"], (.[] | [ .name, (.resourceGroup | ascii_downcase), .location, (."c7n:metrics" | to_entries | map(.value.measurement[0]) | first // "Unknown"), ("https://portal.azure.com/#@/resource" + .id + "/overview") ]) | @tsv' ${OUTPUT_DIR}/azure-c7n-vm-triage/vm-cpu-usage/resources.json | column -t
         RW.Core.Add Pre To Report    High CPU Usage VMs Summary:\n===================================\n${formatted_results.stdout}
 
         FOR    ${vm}    IN    @{vm_list}
             ${pretty_vm}=    Evaluate    pprint.pformat(${vm})    modules=pprint
             ${cpu_percentage}=    Evaluate    list(${vm['c7n:metrics'].values())[0]['measurement'][0]    modules=math
             ${cpu_percentage}=    Convert To Number    ${cpu_percentage}    2
+            ${resource_group}=    Set Variable    ${vm['resourceGroup'].lower()}
+            ${vm_name}=    Set Variable    ${vm['name']}
             RW.Core.Add Issue
             ...    severity=3
-            ...    expected=The VM `${vm['name']}` in resource group `${vm['resourceGroup'].lower()}` should have normal CPU usage
-            ...    actual=The VM `${vm['name']}` has high CPU usage of `${cpu_percentage}`% in the last `${HIGH_CPU_TIMEFRAME}` hours in resource group `${vm['resourceGroup'].lower()}`
-            ...    title=High CPU Usage VM `${vm['name']}` found in Resource Group `${vm['resourceGroup'].lower()}`
+            ...    expected=Azure VM `${vm_name}` should have CPU usage below `${cpu_percentage}%` in resource group ` ${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    actual=Azure VM `${vm_name}` has high CPU usage of `${cpu_percentage}%` in the last `${HIGH_CPU_TIMEFRAME}` hours in resource group ` ${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    title=Azure VM `${vm_name}` with high CPU Usage found in Resource Group ` ${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details=${pretty_vm}
-            ...    next_steps=Increase the CPU cores by resizing to a larger VM SKU in subscription `${AZURE_SUBSCRIPTION_ID}`
+            ...    next_steps=Increase the CPU cores by resizing to a larger azure VM SKU in subscription `${AZURE_SUBSCRIPTION_NAME}`
         END
     ELSE
-        RW.Core.Add Pre To Report    "No VMs with high CPU usage found in subscription `${AZURE_SUBSCRIPTION_ID}`"
+        RW.Core.Add Pre To Report    "No VMs with high CPU usage found in subscription `${AZURE_SUBSCRIPTION_NAME}`"
     END
 
-Check for Stopped VMs In Subscription `${AZURE_SUBSCRIPTION_ID}`
-    [Documentation]    Lists VMs that are in a stopped state in the subscription
-    [Tags]    VM    Azure    State    Cost
+List for Stopped VMs In Subscription `${AZURE_SUBSCRIPTION_NAME}`
+    [Documentation]    Lists VMs that are in a stopped state
+    [Tags]    VM    Azure    State    Cost    access:read-only
     CloudCustodian.Core.Generate Policy   
     ...    ${CURDIR}/stopped-vm.j2
     ...    timeframe=${STOPPED_VM_TIMEFRAME}
@@ -112,22 +116,24 @@ Check for Stopped VMs In Subscription `${AZURE_SUBSCRIPTION_ID}`
 
     IF    len(@{vm_list}) > 0
         ${formatted_results}=    RW.CLI.Run Cli
-        ...    cmd=jq -r '["VM_Name", "Resource_Group", "Location", "VM_Link"], (.[] | [ .name, .resourceGroup, .location, ("https://portal.azure.com/#@/resource" + .id + "/overview") ]) | @tsv' ${OUTPUT_DIR}/azure-c7n-vm-triage/stopped-vms/resources.json | column -t
+        ...    cmd=jq -r '["VM_Name", "Resource_Group", "Location", "VM_Link"], (.[] | [ .name, (.resourceGroup | ascii_downcase), .location, ("https://portal.azure.com/#@/resource" + .id + "/overview") ]) | @tsv' ${OUTPUT_DIR}/azure-c7n-vm-triage/stopped-vms/resources.json | column -t
         RW.Core.Add Pre To Report    Stopped VMs Summary:\n========================\n${formatted_results.stdout}
 
         FOR    ${vm}    IN    @{vm_list}
             ${pretty_vm}=    Evaluate    pprint.pformat(${vm})    modules=pprint
+            ${resource_group}=    Set Variable    ${vm['resourceGroup'].lower()}
+            ${vm_name}=    Set Variable    ${vm['name']}
             RW.Core.Add Issue
             ...    severity=4
-            ...    expected=The VM `${vm['name']}` in resource group `${vm['resourceGroup'].lower()}` should be running or deleted
-            ...    actual=The VM `${vm['name']}` in resource group `${vm['resourceGroup'].lower()}` is in a stopped state since `${STOPPED_VM_TIMEFRAME}` hours
-            ...    title=Stopped VM `${vm['name']}` found in Resource Group `${vm['resourceGroup'].lower()}`
+            ...    expected=Azure VM `${vm_name}` should be in use in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    actual=Azure VM `${vm_name}` is in stopped state more than `${STOPPED_VM_TIMEFRAME}` hours in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    title=Stopped Azure VM `${vm_name}` found in Resource Group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details=${pretty_vm}
-            ...    next_steps=Deleting it if no longer needed to reduce costs in subscription `${AZURE_SUBSCRIPTION_ID}`
+            ...    next_steps=Delete the stopped azure vm if no longer needed to reduce costs in subscription `${AZURE_SUBSCRIPTION_NAME}`
         END
     ELSE
-        RW.Core.Add Pre To Report    "No stopped VMs found in subscription `${AZURE_SUBSCRIPTION_ID}`"
+        RW.Core.Add Pre To Report    "No stopped VMs found in subscription `${AZURE_SUBSCRIPTION_NAME}`"
     END
 
 
@@ -161,10 +167,10 @@ Suite Initialization
     ...    pattern=^\d+$
     ...    example=24
     ...    default=24
+    ${subscription_name}=    RW.CLI.Run Cli
+    ...    cmd=az account show --subscription ${AZURE_SUBSCRIPTION_ID} --query name -o tsv
+    Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${subscription_name.stdout.strip()}
     Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}    ${AZURE_SUBSCRIPTION_ID}
     Set Suite Variable    ${HIGH_CPU_PERCENTAGE}    ${HIGH_CPU_PERCENTAGE}
     Set Suite Variable    ${HIGH_CPU_TIMEFRAME}    ${HIGH_CPU_TIMEFRAME}
     Set Suite Variable    ${STOPPED_VM_TIMEFRAME}    ${STOPPED_VM_TIMEFRAME}
-    # Set Suite Variable
-    # ...    ${env}
-    # ...    {"AZURE_TENANT_ID":"${AZURE_TENANT_ID}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}", "AZURE_CLIENT_ID": "${AZURE_CLIENT_ID}" , "OUTPUT_DIR":"${OUTPUT_DIR}"}
