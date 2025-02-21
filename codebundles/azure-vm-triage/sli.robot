@@ -11,6 +11,7 @@ Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
 Library    CloudCustodian.Core
+Library    Screenshot
 
 Suite Setup         Suite Initialization
 *** Tasks ***
@@ -51,9 +52,22 @@ Check for Stopped VMs In Subscription `${AZURE_SUBSCRIPTION_NAME}`
     ${stopped_vm_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_STOPPED_VM}) else 0
     Set Global Variable    ${stopped_vm_score}
 
+Check for Underutilized VMs In Subscription `${AZURE_SUBSCRIPTION_NAME}`
+    [Documentation]    Count VMs that are underutilized based on CPU usage
+    [Tags]    VM    Azure    CPU    Utilization    access:read-only
+    CloudCustodian.Core.Generate Policy   
+    ...    ${CURDIR}/under-utilized-vm-cpu-usage.j2
+    ...    cpu_percentage=${LOW_CPU_PERCENTAGE}
+    ...    timeframe=${LOW_CPU_TIMEFRAME}
+    ${c7n_output}=    RW.CLI.Run Cli
+    ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-triage ${CURDIR}/under-utilized-vm-cpu-usage.yaml --cache-period 0
+    ${count}=    RW.CLI.Run Cli
+    ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-triage/under-utilized-vm-cpu-usage/metadata.json | jq '.metrics[] | select(.MetricName == "ResourceCount") | .Value';
+    ${underutilized_vm_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_UNDERUTILIZED_VM}) else 0
+    Set Global Variable    ${underutilized_vm_score}
 
 Generate Health Score
-    ${health_score}=    Evaluate  (${vm_with_public_ip_score} + ${cpu_usage_score} + ${stopped_vm_score}) / 3
+    ${health_score}=    Evaluate  (${vm_with_public_ip_score} + ${cpu_usage_score} + ${stopped_vm_score} + ${underutilized_vm_score}) / 4
     ${health_score}=    Convert to Number    ${health_score}  2
     RW.Core.Push Metric    ${health_score}
 
@@ -106,13 +120,34 @@ Suite Initialization
     ...    pattern=^\d+$
     ...    example=24
     ...    default=24
+    ${LOW_CPU_PERCENTAGE}=    RW.Core.Import User Variable    LOW_CPU_PERCENTAGE
+    ...    type=string
+    ...    description=The CPU percentage threshold to identify underutilized VMs.
+    ...    pattern=^\d+$
+    ...    example=10
+    ...    default=10
+    ${LOW_CPU_TIMEFRAME}=    RW.Core.Import User Variable    LOW_CPU_TIMEFRAME
+    ...    type=string
+    ...    description=The timeframe (in hours) to evaluate low CPU usage.
+    ...    pattern=^\d+$
+    ...    example=24
+    ...    default=24
+    ${MAX_UNDERUTILIZED_VM}=    RW.Core.Import User Variable    MAX_UNDERUTILIZED_VM
+    ...    type=string
+    ...    description=The maximum number of underutilized VMs to allow.
+    ...    pattern=^\d+$
+    ...    example=1
+    ...    default=0
     ${subscription_name}=    RW.CLI.Run Cli
     ...    cmd=az account show --subscription ${AZURE_SUBSCRIPTION_ID} --query name -o tsv
     Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${subscription_name.stdout.strip()}
     Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}    ${AZURE_SUBSCRIPTION_ID}
     Set Suite Variable    ${HIGH_CPU_PERCENTAGE}    ${HIGH_CPU_PERCENTAGE}
     Set Suite Variable    ${HIGH_CPU_TIMEFRAME}    ${HIGH_CPU_TIMEFRAME}
+    Set Suite Variable    ${LOW_CPU_PERCENTAGE}    ${LOW_CPU_PERCENTAGE}
+    Set Suite Variable    ${LOW_CPU_TIMEFRAME}    ${LOW_CPU_TIMEFRAME}
     Set Suite Variable    ${MAX_VM_WITH_PUBLIC_IP}    ${MAX_VM_WITH_PUBLIC_IP}
     Set Suite Variable    ${MAX_VM_WITH_HIGH_CPU}    ${MAX_VM_WITH_HIGH_CPU}
     Set Suite Variable    ${MAX_STOPPED_VM}    ${MAX_STOPPED_VM}
+    Set Suite Variable    ${MAX_UNDERUTILIZED_VM}    ${MAX_UNDERUTILIZED_VM}
     Set Suite Variable    ${STOPPED_VM_TIMEFRAME}    ${STOPPED_VM_TIMEFRAME}
