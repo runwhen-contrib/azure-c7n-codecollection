@@ -14,9 +14,9 @@ Library    CloudCustodian.Core
 
 Suite Setup         Suite Initialization
 *** Tasks ***
-Check for VMs With Public IP In Azure Subscription `${AZURE_SUBSCRIPTION_ID}`
-    [Documentation]    Lists VMs with public IP addresses in the resource group
-    [Tags]    VM    Azure    Network    Security
+Check for VMs With Public IP In Azure Subscription `${AZURE_SUBSCRIPTION_NAME}`
+    [Documentation]    Lists VMs with public IP address
+    [Tags]    VM    Azure    Network    Security    access:read-only    
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-triage ${CURDIR}/vm-with-public-ip.yaml --cache-period 0
     ${count}=    RW.CLI.Run Cli
@@ -24,9 +24,9 @@ Check for VMs With Public IP In Azure Subscription `${AZURE_SUBSCRIPTION_ID}`
     ${vm_with_public_ip_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_VM_WITH_PUBLIC_IP}) else 0
     Set Global Variable    ${vm_with_public_ip_score}
 
-Check for VMs With High CPU Usage In Subscription `${AZURE_SUBSCRIPTION_ID}`
-    [Documentation]    Checks for VMs with high CPU usage in the subscription
-    [Tags]    VM    Azure    CPU    Performance
+Check for VMs With High CPU Usage In Subscription `${AZURE_SUBSCRIPTION_NAME}`
+    [Documentation]    Checks for VMs with high CPU usage
+    [Tags]    VM    Azure    CPU    Performance    access:read-only
     CloudCustodian.Core.Generate Policy   
     ...    ${CURDIR}/vm-cpu-usage.j2
     ...    cpu_percentage=${HIGH_CPU_PERCENTAGE}
@@ -38,9 +38,9 @@ Check for VMs With High CPU Usage In Subscription `${AZURE_SUBSCRIPTION_ID}`
     ${cpu_usage_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_VM_WITH_HIGH_CPU}) else 0
     Set Global Variable    ${cpu_usage_score}
 
-Check for Stopped VMs In Subscription `${AZURE_SUBSCRIPTION_ID}`
-    [Documentation]    Count VMs that are in a stopped state in the subscription
-    [Tags]    VM    Azure    State    Cost
+Check for Stopped VMs In Subscription `${AZURE_SUBSCRIPTION_NAME}`
+    [Documentation]    Count VMs that are in a stopped state
+    [Tags]    VM    Azure    State    Cost    access:read-only
     CloudCustodian.Core.Generate Policy   
     ...    ${CURDIR}/stopped-vm.j2
     ...    timeframe=${STOPPED_VM_TIMEFRAME}
@@ -105,7 +105,10 @@ Suite Initialization
     ...    description=The timeframe since the VM was stopped.
     ...    pattern=^\d+$
     ...    example=24
-    ...    default=1
+    ...    default=24
+    ${subscription_name}=    RW.CLI.Run Cli
+    ...    cmd=az account show --subscription ${AZURE_SUBSCRIPTION_ID} --query name -o tsv
+    Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${subscription_name.stdout.strip()}
     Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}    ${AZURE_SUBSCRIPTION_ID}
     Set Suite Variable    ${HIGH_CPU_PERCENTAGE}    ${HIGH_CPU_PERCENTAGE}
     Set Suite Variable    ${HIGH_CPU_TIMEFRAME}    ${HIGH_CPU_TIMEFRAME}
@@ -113,7 +116,3 @@ Suite Initialization
     Set Suite Variable    ${MAX_VM_WITH_HIGH_CPU}    ${MAX_VM_WITH_HIGH_CPU}
     Set Suite Variable    ${MAX_STOPPED_VM}    ${MAX_STOPPED_VM}
     Set Suite Variable    ${STOPPED_VM_TIMEFRAME}    ${STOPPED_VM_TIMEFRAME}
-
-    # Set Suite Variable
-    # ...    ${env}
-    # ...    {"AZURE_TENANT_ID":"${AZURE_TENANT_ID}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}", "AZURE_CLIENT_ID": "${AZURE_CLIENT_ID}" , "OUTPUT_DIR":"${OUTPUT_DIR}"}
