@@ -1,5 +1,8 @@
-# Azure Virtual Machine Scale Set Triage
-This codebundle runs a suite of metrics checks for a VM Scale Set in Azure. It fetches activities and the current configuration which is added to a report for review at that point in time.
+# Azure Virtual Machine Triage
+This codebundle runs a suite of metrics checks for VMs in Azure. It identifies:
+- VMs with public IP addresses
+- VMs with high CPU usage
+- Stopped VMs
 
 ## Configuration
 
@@ -9,15 +12,10 @@ The TaskSet requires initialization to import necessary secrets, services, and u
 - `AZ_SECRET_VALUE`: The credential secret value from the app registration
 - `AZ_TENANT`: The Azure tenancy ID
 - `AZ_SUBSCRIPTION`: The Azure subscription ID
-- `AZ_RESOURCE_GROUP`: The Azure resource group that these resources reside in
-- `VMSCALESET`: The name of the VM Scale Set in the resource group to target with checks
+
+## Testing 
+See the .test directory for infrastructure test code. 
 
 ## Notes
 
 This codebundle assumes the service principal authentication flow
-
-## TODO
-- [ ] remote exec functionality
-- [ ] look for notable activities in list
-- [ ] config best practices check
-- [ ] Add documentation
