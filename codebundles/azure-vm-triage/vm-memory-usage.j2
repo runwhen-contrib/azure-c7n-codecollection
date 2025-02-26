@@ -1,0 +1,10 @@
+policies:
+  - name: vm-memory-usage
+    resource: azure.vm
+    filters:
+      - type: metric
+        metric: Available Memory Percentage
+        op: le   # "le" (less than or equal) to detecting low available memory
+        aggregation: average
+        threshold: {{memory_percentage}}  # Set threshold (e.g., trigger if memory availability is ≤ 20%)
+        timeframe: {{timeframe}}  # Timeframe in hours (e.g., last 24 hours)
