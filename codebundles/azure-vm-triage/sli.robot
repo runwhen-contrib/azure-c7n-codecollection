@@ -52,7 +52,7 @@ Check for Stopped VMs In Subscription `${AZURE_SUBSCRIPTION_NAME}`
     ${stopped_vm_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_STOPPED_VM}) else 0
     Set Global Variable    ${stopped_vm_score}
 
-Check for Underutilized VMs In Subscription `${AZURE_SUBSCRIPTION_NAME}`
+Check for Underutilized VMs Based on CPU Usage In Subscription `${AZURE_SUBSCRIPTION_NAME}`
     [Documentation]    Count VMs that are underutilized based on CPU usage
     [Tags]    VM    Azure    CPU    Utilization    access:read-only
     CloudCustodian.Core.Generate Policy   
@@ -80,8 +80,23 @@ Check for VMs With High Memory Usage In Subscription `${AZURE_SUBSCRIPTION_NAME}
     ${high_memory_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_VM_WITH_HIGH_MEMORY}) else 0
     Set Global Variable    ${high_memory_score}
 
+Check for Underutilized VMs Based on Memory Usage In Subscription `${AZURE_SUBSCRIPTION_NAME}`
+    [Documentation]    Count VMs that are underutilized based on memory usage
+    [Tags]    VM    Azure    Memory    Utilization    access:read-only
+    CloudCustodian.Core.Generate Policy   
+    ...    ${CURDIR}/vm-memory-usage.j2
+    ...    memory_percentage=${LOW_MEMORY_PERCENTAGE}
+    ...    timeframe=${LOW_MEMORY_TIMEFRAME}
+    ${c7n_output}=    RW.CLI.Run Cli
+    ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-triage ${CURDIR}/vm-memory-usage.yaml --cache-period 0
+    ${count}=    RW.CLI.Run Cli
+    ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-triage/vm-memory-usage/metadata.json | jq '.metrics[] | select(.MetricName == "ResourceCount") | .Value';
+    ${underutilized_memory_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_UNDERUTILIZED_VM_MEMORY}) else 0
+    Set Global Variable    ${underutilized_memory_score}
+
+
 Generate Health Score
-    ${health_score}=    Evaluate  (${vm_with_public_ip_score} + ${cpu_usage_score} + ${stopped_vm_score} + ${underutilized_vm_score} + ${high_memory_score}) / 5
+    ${health_score}=    Evaluate  (${vm_with_public_ip_score} + ${cpu_usage_score} + ${stopped_vm_score} + ${underutilized_vm_score} + ${high_memory_score} + ${underutilized_memory_score}) / 6
     ${health_score}=    Convert to Number    ${health_score}  2
     RW.Core.Push Metric    ${health_score}
 
@@ -170,6 +185,24 @@ Suite Initialization
     ...    pattern=^\d+$
     ...    example=1
     ...    default=0
+    ${LOW_MEMORY_PERCENTAGE}=    RW.Core.Import User Variable    LOW_MEMORY_PERCENTAGE
+    ...    type=string
+    ...    description=The available memory percentage threshold to check for low memory usage (e.g., 80 means 80% memory available).
+    ...    pattern=^\d+$
+    ...    example=90
+    ...    default=90
+    ${LOW_MEMORY_TIMEFRAME}=    RW.Core.Import User Variable    LOW_MEMORY_TIMEFRAME
+    ...    type=string
+    ...    description=The timeframe to check for low memory usage in hours.
+    ...    pattern=^\d+$
+    ...    example=24
+    ...    default=24
+    ${MAX_UNDERUTILIZED_VM_MEMORY}=    RW.Core.Import User Variable    MAX_UNDERUTILIZED_VM_MEMORY
+    ...    type=string
+    ...    description=The maximum number of VMs with underutilized memory to allow.
+    ...    pattern=^\d+$
+    ...    example=1
+    ...    default=0
     ${subscription_name}=    RW.CLI.Run Cli
     ...    cmd=az account show --subscription ${AZURE_SUBSCRIPTION_ID} --query name -o tsv
     Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${subscription_name.stdout.strip()}
@@ -185,3 +218,6 @@ Suite Initialization
     Set Suite Variable    ${STOPPED_VM_TIMEFRAME}    ${STOPPED_VM_TIMEFRAME}
     Set Suite Variable    ${HIGH_MEMORY_PERCENTAGE}    ${HIGH_MEMORY_PERCENTAGE}
     Set Suite Variable    ${HIGH_MEMORY_TIMEFRAME}    ${HIGH_MEMORY_TIMEFRAME}
+    Set Suite Variable    ${LOW_MEMORY_PERCENTAGE}    ${LOW_MEMORY_PERCENTAGE}
+    Set Suite Variable    ${LOW_MEMORY_TIMEFRAME}    ${LOW_MEMORY_TIMEFRAME}
+    Set Suite Variable    ${MAX_UNDERUTILIZED_VM_MEMORY}    ${MAX_UNDERUTILIZED_VM_MEMORY}
