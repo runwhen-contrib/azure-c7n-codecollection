@@ -66,8 +66,22 @@ Check for Underutilized VMs In Subscription `${AZURE_SUBSCRIPTION_NAME}`
     ${underutilized_vm_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_UNDERUTILIZED_VM}) else 0
     Set Global Variable    ${underutilized_vm_score}
 
+Check for VMs With High Memory Usage In Subscription `${AZURE_SUBSCRIPTION_NAME}`
+    [Documentation]    Count VMs that have high memory usage based on available memory percentage
+    [Tags]    VM    Azure    Memory    Performance    access:read-only
+    CloudCustodian.Core.Generate Policy   
+    ...    ${CURDIR}/vm-memory-usage.j2
+    ...    memory_percentage=${HIGH_MEMORY_PERCENTAGE}
+    ...    timeframe=${HIGH_MEMORY_TIMEFRAME}
+    ${c7n_output}=    RW.CLI.Run Cli
+    ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-triage ${CURDIR}/vm-memory-usage.yaml --cache-period 0
+    ${count}=    RW.CLI.Run Cli
+    ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-triage/vm-memory-usage/metadata.json | jq '.metrics[] | select(.MetricName == "ResourceCount") | .Value';
+    ${high_memory_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_VM_WITH_HIGH_MEMORY}) else 0
+    Set Global Variable    ${high_memory_score}
+
 Generate Health Score
-    ${health_score}=    Evaluate  (${vm_with_public_ip_score} + ${cpu_usage_score} + ${stopped_vm_score} + ${underutilized_vm_score}) / 4
+    ${health_score}=    Evaluate  (${vm_with_public_ip_score} + ${cpu_usage_score} + ${stopped_vm_score} + ${underutilized_vm_score} + ${high_memory_score}) / 5
     ${health_score}=    Convert to Number    ${health_score}  2
     RW.Core.Push Metric    ${health_score}
 
@@ -93,6 +107,18 @@ Suite Initialization
     ${HIGH_CPU_TIMEFRAME}=    RW.Core.Import User Variable    HIGH_CPU_TIMEFRAME
     ...    type=string
     ...    description=The timeframe to check for high CPU usage in hours.
+    ...    pattern=^\d+$
+    ...    example=24
+    ...    default=24
+    ${HIGH_MEMORY_PERCENTAGE}=    RW.Core.Import User Variable    HIGH_MEMORY_PERCENTAGE
+    ...    type=string
+    ...    description=The available memory percentage threshold to check for high memory usage (e.g., 20 means 20% memory available).
+    ...    pattern=^\d+$
+    ...    example=20
+    ...    default=20
+    ${HIGH_MEMORY_TIMEFRAME}=    RW.Core.Import User Variable    HIGH_MEMORY_TIMEFRAME
+    ...    type=string
+    ...    description=The timeframe to check for high memory usage in hours.
     ...    pattern=^\d+$
     ...    example=24
     ...    default=24
@@ -138,6 +164,12 @@ Suite Initialization
     ...    pattern=^\d+$
     ...    example=1
     ...    default=0
+    ${MAX_VM_WITH_HIGH_MEMORY}=    RW.Core.Import User Variable    MAX_VM_WITH_HIGH_MEMORY
+    ...    type=string
+    ...    description=The maximum number of VMs with high memory usage to allow.
+    ...    pattern=^\d+$
+    ...    example=1
+    ...    default=0
     ${subscription_name}=    RW.CLI.Run Cli
     ...    cmd=az account show --subscription ${AZURE_SUBSCRIPTION_ID} --query name -o tsv
     Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${subscription_name.stdout.strip()}
@@ -151,3 +183,5 @@ Suite Initialization
     Set Suite Variable    ${MAX_STOPPED_VM}    ${MAX_STOPPED_VM}
     Set Suite Variable    ${MAX_UNDERUTILIZED_VM}    ${MAX_UNDERUTILIZED_VM}
     Set Suite Variable    ${STOPPED_VM_TIMEFRAME}    ${STOPPED_VM_TIMEFRAME}
+    Set Suite Variable    ${HIGH_MEMORY_PERCENTAGE}    ${HIGH_MEMORY_PERCENTAGE}
+    Set Suite Variable    ${HIGH_MEMORY_TIMEFRAME}    ${HIGH_MEMORY_TIMEFRAME}
