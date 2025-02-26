@@ -174,7 +174,7 @@ List Underutilized VMs Based on CPU Usage in Subscription `${AZURE_SUBSCRIPTION_
             # Convert to a number for further processing
             ${cpu_percentage}=    Convert To Number    ${cpu_percentage_result.stdout}    2
             RW.Core.Add Issue
-            ...    severity=3
+            ...    severity=4
             ...    expected=Azure VM `${vm_name}` should have adequate CPU utilization in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
             ...    actual=Azure VM `${vm_name}` has low CPU usage of `${cpu_percentage}%` in the last `${HIGH_CPU_TIMEFRAME}` hours in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
             ...    title=Underutilized Azure VM `${vm_name}` found in Resource Group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
@@ -184,6 +184,100 @@ List Underutilized VMs Based on CPU Usage in Subscription `${AZURE_SUBSCRIPTION_
         END
     ELSE
         RW.Core.Add Pre To Report    "No underutilized VMs found in subscription `${AZURE_SUBSCRIPTION_NAME}`"
+    END
+
+List VMs With High Memory Usage in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+    [Documentation]    List Azure Virtual Machines (VMs) that have high memory usage based on a defined threshold and timeframe.
+    [Tags]    VM    Azure    Memory    Performance    access:read-only
+    CloudCustodian.Core.Generate Policy   
+    ...    ${CURDIR}/vm-memory-usage.j2
+    ...    memory_percentage=${HIGH_MEMORY_PERCENTAGE}
+    ...    timeframe=${HIGH_MEMORY_TIMEFRAME}
+    ${c7n_output}=    RW.CLI.Run Cli
+    ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-triage ${CURDIR}/vm-memory-usage.yaml --cache-period 0
+    ${report_data}=    RW.CLI.Run Cli
+    ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-triage/vm-memory-usage/resources.json
+
+    TRY
+        ${vm_list}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
+    EXCEPT
+        Log    Failed to load JSON payload, defaulting to empty list.    WARN
+        ${vm_list}=    Create List
+    END
+
+    IF    len(@{vm_list}) > 0
+        ${formatted_results}=    RW.CLI.Run Cli
+        ...    cmd=jq -r '["VM_Name", "Resource_Group", "Location", "Available_Memory%", "VM_Link"], (.[] | [ .name, (.resourceGroup | ascii_downcase), .location, (."c7n:metrics" | to_entries | map(.value.measurement[0]) | first // 0 | tonumber | (. * 100 | round / 100) | tostring), ("https://portal.azure.com/#@/resource" + .id + "/overview") ]) | @tsv' ${OUTPUT_DIR}/azure-c7n-vm-triage/vm-memory-usage/resources.json | column -t
+        RW.Core.Add Pre To Report    VMs With High Memory Usage Summary:\n========================\n${formatted_results.stdout}
+
+        FOR    ${vm}    IN    @{vm_list}
+            ${pretty_vm}=    Evaluate    pprint.pformat(${vm})    modules=pprint
+            ${resource_group}=    Set Variable    ${vm['resourceGroup'].lower()}
+            ${vm_name}=    Set Variable    ${vm['name']}
+            ${json_str}=    Evaluate    json.dumps(${vm})    json
+            ${memory_percentage_result}=    RW.CLI.Run Cli
+            ...    cmd=echo '${json_str}' | jq -r '(."c7n:metrics" | to_entries | map(.value.measurement[0]) | first // "0")'
+            # Convert to a number and calculate memory usage percentage (100 - available memory)
+            ${available_memory}=    Convert To Number    ${memory_percentage_result.stdout}    2
+            ${memory_percentage}=    Evaluate    round(100 - ${available_memory}, 2)
+            RW.Core.Add Issue
+            ...    severity=3
+            ...    expected=Azure VM `${vm_name}` should have adequate available memory in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    actual=Azure VM `${vm_name}` has high memory usage of `${memory_percentage}%` in the last `${HIGH_MEMORY_TIMEFRAME}` hours in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    title=High Memory Usage on Azure VM `${vm_name}` found in Resource Group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    reproduce_hint=${c7n_output.cmd}
+            ...    details=${pretty_vm}
+            ...    next_steps=Consider resizing to a larger azure VM SKU to better match memory usage requirements in subscription `${AZURE_SUBSCRIPTION_NAME}`
+        END
+    ELSE
+        RW.Core.Add Pre To Report    "No VMs with high memory usage found in subscription `${AZURE_SUBSCRIPTION_NAME}`"
+    END
+
+List Underutilized VMs Based on Memory Usage in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+    [Documentation]    List Azure Virtual Machines (VMs) that are underutilized based on memory usage
+    [Tags]    VM    Azure    Memory    Utilization    access:read-only
+    CloudCustodian.Core.Generate Policy   
+    ...    ${CURDIR}/vm-memory-usage.j2
+    ...    memory_percentage=${LOW_MEMORY_PERCENTAGE}
+    ...    timeframe=${LOW_MEMORY_TIMEFRAME}
+    ${c7n_output}=    RW.CLI.Run Cli
+    ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-triage ${CURDIR}/vm-memory-usage.yaml --cache-period 0
+    ${report_data}=    RW.CLI.Run Cli
+    ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-triage/vm-memory-usage/resources.json
+
+    TRY
+        ${vm_list}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
+    EXCEPT
+        Log    Failed to load JSON payload, defaulting to empty list.    WARN
+        ${vm_list}=    Create List
+    END
+
+    IF    len(@{vm_list}) > 0
+        ${formatted_results}=    RW.CLI.Run Cli
+        ...    cmd=jq -r '["VM_Name", "Resource_Group", "Location", "Available_Memory%", "VM_Link"], (.[] | [ .name, (.resourceGroup | ascii_downcase), .location, (."c7n:metrics" | to_entries | map(.value.measurement[0]) | first // 0 | tonumber | (. * 100 | round / 100) | tostring), ("https://portal.azure.com/#@/resource" + .id + "/overview") ]) | @tsv' ${OUTPUT_DIR}/azure-c7n-vm-triage/vm-memory-usage/resources.json | column -t
+        RW.Core.Add Pre To Report    Underutilized VMs Based on Memory Usage Summary:\n========================\n${formatted_results.stdout}
+
+        FOR    ${vm}    IN    @{vm_list}
+            ${pretty_vm}=    Evaluate    pprint.pformat(${vm})    modules=pprint
+            ${resource_group}=    Set Variable    ${vm['resourceGroup'].lower()}
+            ${vm_name}=    Set Variable    ${vm['name']}
+            ${json_str}=    Evaluate    json.dumps(${vm})    json
+            ${memory_percentage_result}=    RW.CLI.Run Cli
+            ...    cmd=echo '${json_str}' | jq -r '(."c7n:metrics" | to_entries | map(.value.measurement[0]) | first // "0")'
+            # Convert to a number and calculate memory usage percentage (100 - available memory)
+            ${available_memory}=    Convert To Number    ${memory_percentage_result.stdout}    2
+            ${memory_percentage}=    Evaluate    round(100 - ${available_memory}, 2)
+            RW.Core.Add Issue
+            ...    severity=4
+            ...    expected=Azure VM `${vm_name}` should have optimal memory utilization in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    actual=Azure VM `${vm_name}` has high available memory of `${memory_percentage}%` in the last `${LOW_MEMORY_TIMEFRAME}` hours in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    title=Underutilized Memory on Azure VM `${vm_name}` found in Resource Group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    reproduce_hint=${c7n_output.cmd}
+            ...    details=${pretty_vm}
+            ...    next_steps=Consider resizing to a smaller azure VM SKU to better match memory usage requirements in subscription `${AZURE_SUBSCRIPTION_NAME}`
+        END
+    ELSE
+        RW.Core.Add Pre To Report    "No underutilized VMs based on memory usage found in subscription `${AZURE_SUBSCRIPTION_NAME}`"
     END
 
 
@@ -229,6 +323,30 @@ Suite Initialization
     ...    pattern=^\d+$
     ...    example=24
     ...    default=24
+    ${HIGH_MEMORY_PERCENTAGE}=    RW.Core.Import User Variable    HIGH_MEMORY_PERCENTAGE
+    ...    type=string
+    ...    description=The available memory percentage threshold to check for high memory usage (e.g., 20 means 20% memory available).
+    ...    pattern=^\d+$
+    ...    example=20
+    ...    default=20
+    ${HIGH_MEMORY_TIMEFRAME}=    RW.Core.Import User Variable    HIGH_MEMORY_TIMEFRAME
+    ...    type=string
+    ...    description=The timeframe to check for high memory usage in hours.
+    ...    pattern=^\d+$
+    ...    example=24
+    ...    default=24
+    ${LOW_MEMORY_PERCENTAGE}=    RW.Core.Import User Variable    LOW_MEMORY_PERCENTAGE
+    ...    type=string
+    ...    description=The available memory percentage threshold to check for low memory usage (e.g., 80 means 80% memory available).
+    ...    pattern=^\d+$
+    ...    example=90
+    ...    default=90
+    ${LOW_MEMORY_TIMEFRAME}=    RW.Core.Import User Variable    LOW_MEMORY_TIMEFRAME
+    ...    type=string
+    ...    description=The timeframe to check for low memory usage in hours.
+    ...    pattern=^\d+$
+    ...    example=24
+    ...    default=24
     ${subscription_name}=    RW.CLI.Run Cli
     ...    cmd=az account show --subscription ${AZURE_SUBSCRIPTION_ID} --query name -o tsv
     Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${subscription_name.stdout.strip()}
@@ -238,3 +356,7 @@ Suite Initialization
     Set Suite Variable    ${LOW_CPU_PERCENTAGE}    ${LOW_CPU_PERCENTAGE}
     Set Suite Variable    ${LOW_CPU_TIMEFRAME}    ${LOW_CPU_TIMEFRAME}
     Set Suite Variable    ${STOPPED_VM_TIMEFRAME}    ${STOPPED_VM_TIMEFRAME}
+    Set Suite Variable    ${HIGH_MEMORY_PERCENTAGE}    ${HIGH_MEMORY_PERCENTAGE}
+    Set Suite Variable    ${HIGH_MEMORY_TIMEFRAME}    ${HIGH_MEMORY_TIMEFRAME}
+    Set Suite Variable    ${LOW_MEMORY_PERCENTAGE}    ${LOW_MEMORY_PERCENTAGE}
+    Set Suite Variable    ${LOW_MEMORY_TIMEFRAME}    ${LOW_MEMORY_TIMEFRAME}
