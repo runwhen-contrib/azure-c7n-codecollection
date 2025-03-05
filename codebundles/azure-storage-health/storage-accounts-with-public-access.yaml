@@ -1,0 +1,7 @@
+policies:
+  - name: storage-accounts-with-public-access
+    resource: azure.storage
+    filters:
+      - type: value
+        key: properties.networkAcls.defaultAction
+        value: "Allow"
