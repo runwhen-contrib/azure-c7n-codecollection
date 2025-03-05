@@ -1,0 +1,9 @@
+policies:
+  - name: disks-with-cost-recommendations
+    resource: azure.disk
+    filters:
+      - type: advisor-recommendation
+        category: Cost
+        key: '[].properties.recommendationTypeId'
+        op: contains
+        value: '48eda464-1485-4dcf-a674-d0905df5054a'
