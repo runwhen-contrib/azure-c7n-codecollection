@@ -107,6 +107,7 @@ tasks:
           codeBundles: ["$codebundle"]
         custom:
           subscription_name: $subscription_name
+          resource_group: $resource_group
         EOF
     silent: true
 
