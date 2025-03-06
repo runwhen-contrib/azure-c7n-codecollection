@@ -14,7 +14,7 @@ Library    CloudCustodian.Core
 
 Suite Setup         Suite Initialization
 *** Tasks ***
-Check for Unused Disks In Subscription `${AZURE_SUBSCRIPTION_NAME}`
+Check for Unused Disks in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
     [Documentation]    Count disks that are not attached to any VM
     [Tags]    Disk    Azure    Storage    Cost    access:read-only
     ${c7n_output}=    RW.CLI.Run Cli
@@ -24,7 +24,7 @@ Check for Unused Disks In Subscription `${AZURE_SUBSCRIPTION_NAME}`
     ${unused_disk_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_UNUSED_DISK}) else 0
     Set Global Variable    ${unused_disk_score}
 
-Check for Unused Snapshots In Subscription `${AZURE_SUBSCRIPTION_NAME}`
+Check for Unused Snapshots in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
     [Documentation]    Count snapshots that are not attached to any disk
     [Tags]    Snapshot    Azure    Storage    Cost    access:read-only
     ${c7n_output}=    RW.CLI.Run Cli
@@ -34,7 +34,7 @@ Check for Unused Snapshots In Subscription `${AZURE_SUBSCRIPTION_NAME}`
     ${unused_snapshot_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_UNUSED_SNAPSHOT}) else 0
     Set Global Variable    ${unused_snapshot_score}
 
-Check for Unused Storage Accounts In Subscription `${AZURE_SUBSCRIPTION_NAME}`
+Check for Unused Storage Accounts in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
     [Documentation]    Count storage accounts with no transactions
     [Tags]    Storage    Azure    Cost    access:read-only
     CloudCustodian.Core.Generate Policy   
@@ -48,7 +48,7 @@ Check for Unused Storage Accounts In Subscription `${AZURE_SUBSCRIPTION_NAME}`
     Set Global Variable    ${unused_storage_account_score}
 
 
-Check for Public Accessible Storage Accounts In Subscription `${AZURE_SUBSCRIPTION_NAME}`
+Check for Public Accessible Storage Accounts in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
     [Documentation]    Count storage accounts with public access enabled
     [Tags]    Storage    Azure    Security    access:read-only
     ${c7n_output}=    RW.CLI.Run Cli
@@ -75,6 +75,11 @@ Suite Initialization
     ${AZURE_SUBSCRIPTION_ID}=    RW.Core.Import User Variable    AZURE_SUBSCRIPTION_ID
     ...    type=string
     ...    description=The Azure Subscription ID for the resource.  
+    ...    pattern=\w*
+    ...    default=""
+    ${AZURE_SUBSCRIPTION_NAME}=    RW.Core.Import User Variable    AZURE_SUBSCRIPTION_NAME
+    ...    type=string
+    ...    description=The Azure Subscription Name.  
     ...    pattern=\w*
     ...    default=""
     ${MAX_UNUSED_DISK}=    RW.Core.Import User Variable    MAX_UNUSED_DISK
@@ -106,9 +111,7 @@ Suite Initialization
     ...    pattern=^\d+$
     ...    example=1
     ...    default=0
-    ${subscription_name}=    RW.CLI.Run Cli
-    ...    cmd=az account show --subscription ${AZURE_SUBSCRIPTION_ID} --query name -o tsv
-    Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${subscription_name.stdout.strip()}
+    Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${AZURE_SUBSCRIPTION_NAME}
     Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}    ${AZURE_SUBSCRIPTION_ID}
     Set Suite Variable    ${MAX_UNUSED_DISK}    ${MAX_UNUSED_DISK}
     Set Suite Variable    ${MAX_UNUSED_SNAPSHOT}    ${MAX_UNUSED_SNAPSHOT}
