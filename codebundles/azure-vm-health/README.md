@@ -1,4 +1,4 @@
-# Azure Virtual Machine Triage
+# Azure Virtual Machine Health
 This codebundle runs a suite of metrics checks for VMs in Azure. It identifies:
 - VMs with public IP addresses
 - VMs with high CPU usage

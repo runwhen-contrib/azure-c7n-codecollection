@@ -1,8 +1,8 @@
 *** Settings ***
 Documentation       List Virtual machines that are publicly accessible and have high CPU usage in Azure  
 Metadata            Author    saurabh3460
-Metadata            Display Name    Azure    Triage
-Metadata            Supports    Azure    Virtual Machine    Triage    Health
+Metadata            Display Name    Azure    Health
+Metadata            Supports    Azure    Virtual Machine    Health
 Force Tags          Azure    Virtual Machine    Health
 
 Library    String
@@ -20,9 +20,9 @@ List VMs With Public IP In Azure Subscription `${AZURE_SUBSCRIPTION_NAME}`
     [Documentation]    Lists VMs with public IP address
     [Tags]    VM    Azure    Network    Security    access:read-only
     ${c7n_output}=    RW.CLI.Run Cli
-    ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-triage ${CURDIR}/vm-with-public-ip.yaml --cache-period 0
+    ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/vm-with-public-ip.yaml --cache-period 0
     ${report_data}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-triage/vm-with-public-ip/resources.json
+    ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-health/vm-with-public-ip/resources.json
 
     TRY
         ${vm_list}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
@@ -33,7 +33,7 @@ List VMs With Public IP In Azure Subscription `${AZURE_SUBSCRIPTION_NAME}`
 
     IF    len(@{vm_list}) > 0
         ${formatted_results}=    RW.CLI.Run Cli
-        ...    cmd=jq -r '["VM_Name", "Resource_Group", "Location", "VM_Link"], (.[] | [ .name, (.resourceGroup | ascii_downcase), .location, ("https://portal.azure.com/#@/resource" + .id + "/overview") ]) | @tsv' ${OUTPUT_DIR}/azure-c7n-vm-triage/vm-with-public-ip/resources.json | column -t
+        ...    cmd=jq -r '["VM_Name", "Resource_Group", "Location", "VM_Link"], (.[] | [ .name, (.resourceGroup | ascii_downcase), .location, ("https://portal.azure.com/#@/resource" + .id + "/overview") ]) | @tsv' ${OUTPUT_DIR}/azure-c7n-vm-health/vm-with-public-ip/resources.json | column -t
         RW.Core.Add Pre To Report    Virtual Machines Summary:\n===================================\n${formatted_results.stdout}
 
         FOR    ${vm}    IN    @{vm_list}
@@ -60,9 +60,9 @@ List for Stopped VMs In Subscription `${AZURE_SUBSCRIPTION_NAME}`
     ...    ${CURDIR}/stopped-vm.j2
     ...    timeframe=${STOPPED_VM_TIMEFRAME}
     ${c7n_output}=    RW.CLI.Run Cli
-    ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-triage ${CURDIR}/stopped-vm.yaml --cache-period 0
+    ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/stopped-vm.yaml --cache-period 0
     ${report_data}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-triage/stopped-vms/resources.json
+    ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-health/stopped-vms/resources.json
 
     TRY
         ${vm_list}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
@@ -73,7 +73,7 @@ List for Stopped VMs In Subscription `${AZURE_SUBSCRIPTION_NAME}`
 
     IF    len(@{vm_list}) > 0
         ${formatted_results}=    RW.CLI.Run Cli
-        ...    cmd=jq -r '["VM_Name", "Resource_Group", "Location", "VM_Link"], (.[] | [ .name, (.resourceGroup | ascii_downcase), .location, ("https://portal.azure.com/#@/resource" + .id + "/overview") ]) | @tsv' ${OUTPUT_DIR}/azure-c7n-vm-triage/stopped-vms/resources.json | column -t
+        ...    cmd=jq -r '["VM_Name", "Resource_Group", "Location", "VM_Link"], (.[] | [ .name, (.resourceGroup | ascii_downcase), .location, ("https://portal.azure.com/#@/resource" + .id + "/overview") ]) | @tsv' ${OUTPUT_DIR}/azure-c7n-vm-health/stopped-vms/resources.json | column -t
         RW.Core.Add Pre To Report    Stopped VMs Summary:\n========================\n${formatted_results.stdout}
 
         FOR    ${vm}    IN    @{vm_list}
@@ -101,9 +101,9 @@ List VMs With High CPU Usage In Subscription `${AZURE_SUBSCRIPTION_NAME}`
     ...    cpu_percentage=${HIGH_CPU_PERCENTAGE}
     ...    timeframe=${HIGH_CPU_TIMEFRAME}
     ${c7n_output}=    RW.CLI.Run Cli
-    ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-triage ${CURDIR}/vm-cpu-usage.yaml --cache-period 0
+    ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/vm-cpu-usage.yaml --cache-period 0
     ${report_data}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-triage/vm-cpu-usage/resources.json
+    ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-health/vm-cpu-usage/resources.json
 
     TRY
         ${vm_list}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
@@ -114,7 +114,7 @@ List VMs With High CPU Usage In Subscription `${AZURE_SUBSCRIPTION_NAME}`
 
     IF    len(@{vm_list}) > 0
         ${formatted_results}=    RW.CLI.Run Cli
-        ...    cmd=jq -r '["VM_Name", "Resource_Group", "Location", "CPU_Usage%", "VM_Link"], (.[] | [ .name, (.resourceGroup | ascii_downcase), .location, (."c7n:metrics" | to_entries | map(.value.measurement[0]) | first // 0 | tonumber | (. * 100 | round / 100) | tostring), ("https://portal.azure.com/#@/resource" + .id + "/overview") ]) | @tsv' ${OUTPUT_DIR}/azure-c7n-vm-triage/vm-cpu-usage/resources.json | column -t
+        ...    cmd=jq -r '["VM_Name", "Resource_Group", "Location", "CPU_Usage%", "VM_Link"], (.[] | [ .name, (.resourceGroup | ascii_downcase), .location, (."c7n:metrics" | to_entries | map(.value.measurement[0]) | first // 0 | tonumber | (. * 100 | round / 100) | tostring), ("https://portal.azure.com/#@/resource" + .id + "/overview") ]) | @tsv' ${OUTPUT_DIR}/azure-c7n-vm-health/vm-cpu-usage/resources.json | column -t
         RW.Core.Add Pre To Report    High CPU Usage VMs Summary:\n===================================\n${formatted_results.stdout}
 
         FOR    ${vm}    IN    @{vm_list}
@@ -148,9 +148,9 @@ List Underutilized VMs Based on CPU Usage in Subscription `${AZURE_SUBSCRIPTION_
     ...    cpu_percentage=${LOW_CPU_PERCENTAGE}
     ...    timeframe=${LOW_CPU_TIMEFRAME}
     ${c7n_output}=    RW.CLI.Run Cli
-    ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-triage ${CURDIR}/under-utilized-vm-cpu-usage.yaml --cache-period 0
+    ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/under-utilized-vm-cpu-usage.yaml --cache-period 0
     ${report_data}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-triage/under-utilized-vm-cpu-usage/resources.json
+    ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-health/under-utilized-vm-cpu-usage/resources.json
 
     TRY
         ${vm_list}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
@@ -161,7 +161,7 @@ List Underutilized VMs Based on CPU Usage in Subscription `${AZURE_SUBSCRIPTION_
 
     IF    len(@{vm_list}) > 0
         ${formatted_results}=    RW.CLI.Run Cli
-        ...    cmd=...    cmd=jq -r '["VM_Name", "Resource_Group", "Location", "CPU_Usage%", "VM_Link"], (.[] | [ .name, (.resourceGroup | ascii_downcase), .location, (."c7n:metrics" | to_entries | map(.value.measurement[0]) | first // 0 | tonumber | (. * 100 | round / 100) | tostring), ("https://portal.azure.com/#@/resource" + .id + "/overview") ]) | @tsv' ${OUTPUT_DIR}/azure-c7n-vm-triage/under-utilized-vm-cpu-usage/resources.json | column -t
+        ...    cmd=...    cmd=jq -r '["VM_Name", "Resource_Group", "Location", "CPU_Usage%", "VM_Link"], (.[] | [ .name, (.resourceGroup | ascii_downcase), .location, (."c7n:metrics" | to_entries | map(.value.measurement[0]) | first // 0 | tonumber | (. * 100 | round / 100) | tostring), ("https://portal.azure.com/#@/resource" + .id + "/overview") ]) | @tsv' ${OUTPUT_DIR}/azure-c7n-vm-health/under-utilized-vm-cpu-usage/resources.json | column -t
         RW.Core.Add Pre To Report    Underutilized VMs Based on CPU Summary:\n========================\n${formatted_results.stdout}
 
         FOR    ${vm}    IN    @{vm_list}
@@ -194,9 +194,9 @@ List VMs With High Memory Usage in Subscription `${AZURE_SUBSCRIPTION_NAME}`
     ...    memory_percentage=${HIGH_MEMORY_PERCENTAGE}
     ...    timeframe=${HIGH_MEMORY_TIMEFRAME}
     ${c7n_output}=    RW.CLI.Run Cli
-    ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-triage ${CURDIR}/vm-memory-usage.yaml --cache-period 0
+    ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/vm-memory-usage.yaml --cache-period 0
     ${report_data}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-triage/vm-memory-usage/resources.json
+    ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-health/vm-memory-usage/resources.json
 
     TRY
         ${vm_list}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
@@ -207,7 +207,7 @@ List VMs With High Memory Usage in Subscription `${AZURE_SUBSCRIPTION_NAME}`
 
     IF    len(@{vm_list}) > 0
         ${formatted_results}=    RW.CLI.Run Cli
-        ...    cmd=jq -r '["VM_Name", "Resource_Group", "Location", "Available_Memory%", "VM_Link"], (.[] | [ .name, (.resourceGroup | ascii_downcase), .location, (."c7n:metrics" | to_entries | map(.value.measurement[0]) | first // 0 | tonumber | (. * 100 | round / 100) | tostring), ("https://portal.azure.com/#@/resource" + .id + "/overview") ]) | @tsv' ${OUTPUT_DIR}/azure-c7n-vm-triage/vm-memory-usage/resources.json | column -t
+        ...    cmd=jq -r '["VM_Name", "Resource_Group", "Location", "Available_Memory%", "VM_Link"], (.[] | [ .name, (.resourceGroup | ascii_downcase), .location, (."c7n:metrics" | to_entries | map(.value.measurement[0]) | first // 0 | tonumber | (. * 100 | round / 100) | tostring), ("https://portal.azure.com/#@/resource" + .id + "/overview") ]) | @tsv' ${OUTPUT_DIR}/azure-c7n-vm-health/vm-memory-usage/resources.json | column -t
         RW.Core.Add Pre To Report    VMs With High Memory Usage Summary:\n========================\n${formatted_results.stdout}
 
         FOR    ${vm}    IN    @{vm_list}
@@ -241,9 +241,9 @@ List Underutilized VMs Based on Memory Usage in Subscription `${AZURE_SUBSCRIPTI
     ...    memory_percentage=${LOW_MEMORY_PERCENTAGE}
     ...    timeframe=${LOW_MEMORY_TIMEFRAME}
     ${c7n_output}=    RW.CLI.Run Cli
-    ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-triage ${CURDIR}/vm-memory-usage.yaml --cache-period 0
+    ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/vm-memory-usage.yaml --cache-period 0
     ${report_data}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-triage/vm-memory-usage/resources.json
+    ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-health/vm-memory-usage/resources.json
 
     TRY
         ${vm_list}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
@@ -254,7 +254,7 @@ List Underutilized VMs Based on Memory Usage in Subscription `${AZURE_SUBSCRIPTI
 
     IF    len(@{vm_list}) > 0
         ${formatted_results}=    RW.CLI.Run Cli
-        ...    cmd=jq -r '["VM_Name", "Resource_Group", "Location", "Available_Memory%", "VM_Link"], (.[] | [ .name, (.resourceGroup | ascii_downcase), .location, (."c7n:metrics" | to_entries | map(.value.measurement[0]) | first // 0 | tonumber | (. * 100 | round / 100) | tostring), ("https://portal.azure.com/#@/resource" + .id + "/overview") ]) | @tsv' ${OUTPUT_DIR}/azure-c7n-vm-triage/vm-memory-usage/resources.json | column -t
+        ...    cmd=jq -r '["VM_Name", "Resource_Group", "Location", "Available_Memory%", "VM_Link"], (.[] | [ .name, (.resourceGroup | ascii_downcase), .location, (."c7n:metrics" | to_entries | map(.value.measurement[0]) | first // 0 | tonumber | (. * 100 | round / 100) | tostring), ("https://portal.azure.com/#@/resource" + .id + "/overview") ]) | @tsv' ${OUTPUT_DIR}/azure-c7n-vm-health/vm-memory-usage/resources.json | column -t
         RW.Core.Add Pre To Report    Underutilized VMs Based on Memory Usage Summary:\n========================\n${formatted_results.stdout}
 
         FOR    ${vm}    IN    @{vm_list}

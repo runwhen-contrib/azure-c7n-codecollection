@@ -1,8 +1,8 @@
 *** Settings ***
 Documentation       Count Virtual machines that are publicly accessible and have high CPU usage in Azure  
 Metadata            Author    saurabh3460
-Metadata            Display Name    Azure    Triage
-Metadata            Supports    Azure    Virtual Machine    Triage    Health
+Metadata            Display Name    Azure    Virtual Machine    Health
+Metadata            Supports    Azure    Virtual Machine    Health
 Force Tags          Azure    Virtual Machine    Health
 
 Library    String
@@ -11,7 +11,6 @@ Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
 Library    CloudCustodian.Core
-Library    Screenshot
 
 Suite Setup         Suite Initialization
 *** Tasks ***
@@ -19,9 +18,9 @@ Check for VMs With Public IP In Azure Subscription `${AZURE_SUBSCRIPTION_NAME}`
     [Documentation]    Lists VMs with public IP address
     [Tags]    VM    Azure    Network    Security    access:read-only    
     ${c7n_output}=    RW.CLI.Run Cli
-    ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-triage ${CURDIR}/vm-with-public-ip.yaml --cache-period 0
+    ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/vm-with-public-ip.yaml --cache-period 0
     ${count}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-triage/vm-with-public-ip/metadata.json | jq '.metrics[] | select(.MetricName == "ResourceCount") | .Value';
+    ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-health/vm-with-public-ip/metadata.json | jq '.metrics[] | select(.MetricName == "ResourceCount") | .Value';
     ${vm_with_public_ip_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_VM_WITH_PUBLIC_IP}) else 0
     Set Global Variable    ${vm_with_public_ip_score}
 
@@ -33,9 +32,9 @@ Check for VMs With High CPU Usage In Subscription `${AZURE_SUBSCRIPTION_NAME}`
     ...    cpu_percentage=${HIGH_CPU_PERCENTAGE}
     ...    timeframe=${HIGH_CPU_TIMEFRAME}
     ${c7n_output}=    RW.CLI.Run Cli
-    ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-triage ${CURDIR}/vm-cpu-usage.yaml --cache-period 0
+    ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/vm-cpu-usage.yaml --cache-period 0
     ${count}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-triage/vm-cpu-usage/metadata.json | jq '.metrics[] | select(.MetricName == "ResourceCount") | .Value';
+    ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-health/vm-cpu-usage/metadata.json | jq '.metrics[] | select(.MetricName == "ResourceCount") | .Value';
     ${cpu_usage_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_VM_WITH_HIGH_CPU}) else 0
     Set Global Variable    ${cpu_usage_score}
 
@@ -46,9 +45,9 @@ Check for Stopped VMs In Subscription `${AZURE_SUBSCRIPTION_NAME}`
     ...    ${CURDIR}/stopped-vm.j2
     ...    timeframe=${STOPPED_VM_TIMEFRAME}
     ${c7n_output}=    RW.CLI.Run Cli
-    ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-triage ${CURDIR}/stopped-vm.yaml --cache-period 0
+    ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/stopped-vm.yaml --cache-period 0
     ${count}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-triage/stopped-vms/metadata.json | jq '.metrics[] | select(.MetricName == "ResourceCount") | .Value';
+    ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-health/stopped-vms/metadata.json | jq '.metrics[] | select(.MetricName == "ResourceCount") | .Value';
     ${stopped_vm_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_STOPPED_VM}) else 0
     Set Global Variable    ${stopped_vm_score}
 
@@ -60,9 +59,9 @@ Check for Underutilized VMs Based on CPU Usage In Subscription `${AZURE_SUBSCRIP
     ...    cpu_percentage=${LOW_CPU_PERCENTAGE}
     ...    timeframe=${LOW_CPU_TIMEFRAME}
     ${c7n_output}=    RW.CLI.Run Cli
-    ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-triage ${CURDIR}/under-utilized-vm-cpu-usage.yaml --cache-period 0
+    ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/under-utilized-vm-cpu-usage.yaml --cache-period 0
     ${count}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-triage/under-utilized-vm-cpu-usage/metadata.json | jq '.metrics[] | select(.MetricName == "ResourceCount") | .Value';
+    ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-health/under-utilized-vm-cpu-usage/metadata.json | jq '.metrics[] | select(.MetricName == "ResourceCount") | .Value';
     ${underutilized_vm_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_UNDERUTILIZED_VM}) else 0
     Set Global Variable    ${underutilized_vm_score}
 
@@ -74,9 +73,9 @@ Check for VMs With High Memory Usage In Subscription `${AZURE_SUBSCRIPTION_NAME}
     ...    memory_percentage=${HIGH_MEMORY_PERCENTAGE}
     ...    timeframe=${HIGH_MEMORY_TIMEFRAME}
     ${c7n_output}=    RW.CLI.Run Cli
-    ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-triage ${CURDIR}/vm-memory-usage.yaml --cache-period 0
+    ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/vm-memory-usage.yaml --cache-period 0
     ${count}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-triage/vm-memory-usage/metadata.json | jq '.metrics[] | select(.MetricName == "ResourceCount") | .Value';
+    ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-health/vm-memory-usage/metadata.json | jq '.metrics[] | select(.MetricName == "ResourceCount") | .Value';
     ${high_memory_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_VM_WITH_HIGH_MEMORY}) else 0
     Set Global Variable    ${high_memory_score}
 
@@ -88,9 +87,9 @@ Check for Underutilized VMs Based on Memory Usage In Subscription `${AZURE_SUBSC
     ...    memory_percentage=${LOW_MEMORY_PERCENTAGE}
     ...    timeframe=${LOW_MEMORY_TIMEFRAME}
     ${c7n_output}=    RW.CLI.Run Cli
-    ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-triage ${CURDIR}/vm-memory-usage.yaml --cache-period 0
+    ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/vm-memory-usage.yaml --cache-period 0
     ${count}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-triage/vm-memory-usage/metadata.json | jq '.metrics[] | select(.MetricName == "ResourceCount") | .Value';
+    ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-health/vm-memory-usage/metadata.json | jq '.metrics[] | select(.MetricName == "ResourceCount") | .Value';
     ${underutilized_memory_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_UNDERUTILIZED_VM_MEMORY}) else 0
     Set Global Variable    ${underutilized_memory_score}
 
