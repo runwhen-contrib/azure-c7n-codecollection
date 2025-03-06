@@ -16,7 +16,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-List Unused Azure Disks in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+List Unused Azure Disks in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
     [Documentation]    List Azure disks that are not attached to any VM
     [Tags]    Disk    Azure    Storage    Cost    access:read-only
     ${c7n_output}=    RW.CLI.Run Cli
@@ -48,13 +48,13 @@ List Unused Azure Disks in Subscription `${AZURE_SUBSCRIPTION_NAME}`
             ...    title=Unused Azure Disk `${disk_name}` found in Resource Group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details=${pretty_disk}
-            ...    next_steps=Delete the unused disk to reduce storage costs in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    next_steps=Delete the unused disk to reduce storage costs in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
         END
     ELSE
         RW.Core.Add Pre To Report    "No unused disks found in subscription `${AZURE_SUBSCRIPTION_NAME}`"
     END
 
-List Unused Azure Snapshots in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+List Unused Azure Snapshots in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
     [Documentation]    List Azure snapshots that are not attached
     [Tags]    Snapshot    Azure    Storage    Cost    access:read-only
     ${c7n_output}=    RW.CLI.Run Cli
@@ -86,13 +86,13 @@ List Unused Azure Snapshots in Subscription `${AZURE_SUBSCRIPTION_NAME}`
             ...    title=Unused Azure Snapshot `${snapshot_name}` found in Resource Group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details=${pretty_snapshot}
-            ...    next_steps=Delete the unused snapshot to reduce storage costs in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    next_steps=Delete the unused snapshot to reduce storage costs in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
         END
     ELSE
         RW.Core.Add Pre To Report    "No unused snapshots found in subscription `${AZURE_SUBSCRIPTION_NAME}`"
     END
 
-List Unused Azure Storage Accounts in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+List Unused Azure Storage Accounts in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
     [Documentation]    List Azure storage accounts with no transactions
     [Tags]    Storage    Azure    Cost    access:read-only
     CloudCustodian.Core.Generate Policy   
@@ -126,13 +126,13 @@ List Unused Azure Storage Accounts in Subscription `${AZURE_SUBSCRIPTION_NAME}`
             ...    title=Unused Azure Storage Account `${storage_name}` found in Resource Group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details=${pretty_storage}
-            ...    next_steps=Delete the unused storage account to reduce storage costs in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    next_steps=Delete the unused storage account to reduce storage costs in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
         END
     ELSE
         RW.Core.Add Pre To Report    "No unused storage accounts found in subscription `${AZURE_SUBSCRIPTION_NAME}`"
     END
 
-List Public Accessible Azure Storage Accounts in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+List Public Accessible Azure Storage Accounts in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
     [Documentation]    List Azure storage accounts with public access enabled
     [Tags]    Storage    Azure    Security    access:read-only
     ${c7n_output}=    RW.CLI.Run Cli
@@ -163,7 +163,7 @@ List Public Accessible Azure Storage Accounts in Subscription `${AZURE_SUBSCRIPT
             ...    title=Public Accessible Azure Storage Account `${storage_name}` found in Resource Group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details=${pretty_storage}
-            ...    next_steps=Consider restricting public access to the storage account to improve security in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    next_steps=Consider restricting public access to the storage account to improve security in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
         END
     ELSE
         RW.Core.Add Pre To Report    "No public accessible storage accounts found in subscription `${AZURE_SUBSCRIPTION_NAME}`"
@@ -177,9 +177,18 @@ Suite Initialization
     ...    type=string
     ...    description=The secret containing AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID
     ...    pattern=\w*
+    ${AZURE_RESOURCE_GROUP}=    RW.Core.Import User Variable    AZURE_RESOURCE_GROUP
+    ...    type=string
+    ...    description=Azure resource group.
+    ...    pattern=\w*
     ${AZURE_SUBSCRIPTION_ID}=    RW.Core.Import User Variable    AZURE_SUBSCRIPTION_ID
     ...    type=string
     ...    description=The Azure Subscription ID for the resource.  
+    ...    pattern=\w*
+    ...    default=""
+    ${AZURE_SUBSCRIPTION_NAME}=    RW.Core.Import User Variable    AZURE_SUBSCRIPTION_NAME
+    ...    type=string
+    ...    description=The Azure Subscription Name.  
     ...    pattern=\w*
     ...    default=""
     ${UNUSED_STORAGE_ACCOUNT_TIMEFRAME}=    RW.Core.Import User Variable    UNUSED_STORAGE_ACCOUNT_TIMEFRAME
@@ -187,8 +196,7 @@ Suite Initialization
     ...    description=The timeframe in hours to check for unused storage accounts (e.g., 720 for 30 days)
     ...    pattern=\d+
     ...    default=24
-    ${subscription_name}=    RW.CLI.Run Cli
-    ...    cmd=az account show --subscription ${AZURE_SUBSCRIPTION_ID} --query name -o tsv
-    Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${subscription_name.stdout.strip()}
+    Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${AZURE_SUBSCRIPTION_NAME}
     Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}    ${AZURE_SUBSCRIPTION_ID}
+    Set Suite Variable    ${AZURE_RESOURCE_GROUP}    ${AZURE_RESOURCE_GROUP}
     Set Suite Variable    ${UNUSED_STORAGE_ACCOUNT_TIMEFRAME}    ${UNUSED_STORAGE_ACCOUNT_TIMEFRAME}
