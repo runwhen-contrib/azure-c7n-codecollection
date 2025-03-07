@@ -1,9 +1,9 @@
 *** Settings ***
 Documentation       List Virtual machines that are publicly accessible and have high CPU usage in Azure  
 Metadata            Author    saurabh3460
-Metadata            Display Name    Azure    Health
-Metadata            Supports    Azure    Virtual Machine    Health
-Force Tags          Azure    Virtual Machine    Health
+Metadata            Display Name    Azure Virtual Machine Health
+Metadata            Supports    Azure    Virtual Machine    Health    CloudCustodian
+Force Tags          Azure    Virtual Machine    Health    CloudCustodian
 
 Library    String
 Library             BuiltIn
@@ -16,7 +16,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-List VMs With Public IP In Azure Subscription `${AZURE_SUBSCRIPTION_NAME}`
+List VMs With Public IP in resource group `${AZURE_RESOURCE_GROUP}` in Azure Subscription `${AZURE_SUBSCRIPTION_NAME}`
     [Documentation]    Lists VMs with public IP address
     [Tags]    VM    Azure    Network    Security    access:read-only
     ${c7n_output}=    RW.CLI.Run Cli
@@ -47,13 +47,13 @@ List VMs With Public IP In Azure Subscription `${AZURE_SUBSCRIPTION_NAME}`
             ...    title=Azure VM `${vm_name}` with Public IP Detected in Resource Group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details=${pretty_vm}
-            ...    next_steps=Disable the public IP address from azure VM in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    next_steps=Disable the public IP address from azure VM in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
         END
     ELSE
-        RW.Core.Add Pre To Report    "No VMs with public IPs found in subscription `${AZURE_SUBSCRIPTION_NAME}`"
+        RW.Core.Add Pre To Report    "No VMs with public IPs found in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
     END
 
-List for Stopped VMs In Subscription `${AZURE_SUBSCRIPTION_NAME}`
+List for Stopped VMs in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
     [Documentation]    Lists VMs that are in a stopped state
     [Tags]    VM    Azure    State    Cost    access:read-only
     CloudCustodian.Core.Generate Policy   
@@ -87,13 +87,13 @@ List for Stopped VMs In Subscription `${AZURE_SUBSCRIPTION_NAME}`
             ...    title=Stopped Azure VM `${vm_name}` found in Resource Group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details=${pretty_vm}
-            ...    next_steps=Delete the stopped azure vm if no longer needed to reduce costs in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    next_steps=Delete the stopped azure vm if no longer needed to reduce costs in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
         END
     ELSE
-        RW.Core.Add Pre To Report    "No stopped VMs found in subscription `${AZURE_SUBSCRIPTION_NAME}`"
+        RW.Core.Add Pre To Report    "No stopped VMs found in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
     END
 
-List VMs With High CPU Usage In Subscription `${AZURE_SUBSCRIPTION_NAME}`
+List VMs With High CPU Usage in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
     [Documentation]    Checks for VMs with high CPU usage
     [Tags]    VM    Azure    CPU    Performance    access:read-only
     CloudCustodian.Core.Generate Policy   
@@ -133,14 +133,14 @@ List VMs With High CPU Usage In Subscription `${AZURE_SUBSCRIPTION_NAME}`
             ...    title=Azure VM `${vm_name}` with high CPU Usage found in Resource Group ` ${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details=${pretty_vm}
-            ...    next_steps=Increase the CPU cores by resizing to a larger azure VM SKU in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    next_steps=Increase the CPU cores by resizing to a larger azure VM SKU in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
         END
     ELSE
-        RW.Core.Add Pre To Report    "No VMs with high CPU usage found in subscription `${AZURE_SUBSCRIPTION_NAME}`"
+        RW.Core.Add Pre To Report    "No VMs with high CPU usage found in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
     END
 
 
-List Underutilized VMs Based on CPU Usage in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+List Underutilized VMs Based on CPU Usage in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
     [Documentation]    List Azure Virtual Machines (VMs) that have low CPU utilization based on a defined threshold and timeframe.
     [Tags]    VM    Azure    CPU    Performance    access:read-only
     CloudCustodian.Core.Generate Policy   
@@ -180,19 +180,21 @@ List Underutilized VMs Based on CPU Usage in Subscription `${AZURE_SUBSCRIPTION_
             ...    title=Underutilized Azure VM `${vm_name}` found in Resource Group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details=${pretty_vm}
-            ...    next_steps=Consider resizing to a smaller azure VM SKU to optimize costs in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    next_steps=Resize to a smaller azure VM SKU to optimize costs in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
         END
     ELSE
-        RW.Core.Add Pre To Report    "No underutilized VMs found in subscription `${AZURE_SUBSCRIPTION_NAME}`"
+        RW.Core.Add Pre To Report    "No underutilized VMs found in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
     END
 
-List VMs With High Memory Usage in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+List VMs With High Memory Usage in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
     [Documentation]    List Azure Virtual Machines (VMs) that have high memory usage based on a defined threshold and timeframe.
     [Tags]    VM    Azure    Memory    Performance    access:read-only
     CloudCustodian.Core.Generate Policy   
     ...    ${CURDIR}/vm-memory-usage.j2
+    ...    op=lt
     ...    memory_percentage=${HIGH_MEMORY_PERCENTAGE}
     ...    timeframe=${HIGH_MEMORY_TIMEFRAME}
+    ...    resourceGroup=${AZURE_RESOURCE_GROUP}    
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/vm-memory-usage.yaml --cache-period 0
     ${report_data}=    RW.CLI.Run Cli
@@ -227,19 +229,21 @@ List VMs With High Memory Usage in Subscription `${AZURE_SUBSCRIPTION_NAME}`
             ...    title=High Memory Usage on Azure VM `${vm_name}` found in Resource Group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details=${pretty_vm}
-            ...    next_steps=Consider resizing to a larger azure VM SKU to better match memory usage requirements in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    next_steps=Resize to a larger azure VM SKU to better match memory usage requirements in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
         END
     ELSE
-        RW.Core.Add Pre To Report    "No VMs with high memory usage found in subscription `${AZURE_SUBSCRIPTION_NAME}`"
+        RW.Core.Add Pre To Report    "No VMs with high memory usage found in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
     END
 
-List Underutilized VMs Based on Memory Usage in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+List Underutilized VMs Based on Memory Usage in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
     [Documentation]    List Azure Virtual Machines (VMs) that are underutilized based on memory usage
     [Tags]    VM    Azure    Memory    Utilization    access:read-only
     CloudCustodian.Core.Generate Policy   
     ...    ${CURDIR}/vm-memory-usage.j2
+    ...    op=gt
     ...    memory_percentage=${LOW_MEMORY_PERCENTAGE}
     ...    timeframe=${LOW_MEMORY_TIMEFRAME}
+    ...    resourceGroup=${AZURE_RESOURCE_GROUP}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/vm-memory-usage.yaml --cache-period 0
     ${report_data}=    RW.CLI.Run Cli
@@ -274,10 +278,10 @@ List Underutilized VMs Based on Memory Usage in Subscription `${AZURE_SUBSCRIPTI
             ...    title=Underutilized Memory on Azure VM `${vm_name}` found in Resource Group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details=${pretty_vm}
-            ...    next_steps=Consider resizing to a smaller azure VM SKU to better match memory usage requirements in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    next_steps=Resize to a smaller azure VM SKU to better match memory usage requirements in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
         END
     ELSE
-        RW.Core.Add Pre To Report    "No underutilized VMs based on memory usage found in subscription `${AZURE_SUBSCRIPTION_NAME}`"
+        RW.Core.Add Pre To Report    "No underutilized VMs based on memory usage found in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
     END
 
 
@@ -293,6 +297,15 @@ Suite Initialization
     ...    description=The Azure Subscription ID for the resource.  
     ...    pattern=\w*
     ...    default=""
+    ${AZURE_SUBSCRIPTION_NAME}=    RW.Core.Import User Variable    AZURE_SUBSCRIPTION_NAME
+    ...    type=string
+    ...    description=The Azure Subscription Name.  
+    ...    pattern=\w*
+    ...    default=""
+    ${AZURE_RESOURCE_GROUP}=    RW.Core.Import User Variable    AZURE_RESOURCE_GROUP
+    ...    type=string
+    ...    description=Azure resource group.
+    ...    pattern=\w*
     ${HIGH_CPU_PERCENTAGE}=    RW.Core.Import User Variable    HIGH_CPU_PERCENTAGE
     ...    type=string
     ...    description=The CPU percentage threshold to check for high CPU usage.
@@ -347,10 +360,9 @@ Suite Initialization
     ...    pattern=^\d+$
     ...    example=24
     ...    default=24
-    ${subscription_name}=    RW.CLI.Run Cli
-    ...    cmd=az account show --subscription ${AZURE_SUBSCRIPTION_ID} --query name -o tsv
-    Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${subscription_name.stdout.strip()}
+    Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${AZURE_SUBSCRIPTION_NAME}
     Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}    ${AZURE_SUBSCRIPTION_ID}
+    Set Suite Variable    ${AZURE_RESOURCE_GROUP}    ${AZURE_RESOURCE_GROUP}
     Set Suite Variable    ${HIGH_CPU_PERCENTAGE}    ${HIGH_CPU_PERCENTAGE}
     Set Suite Variable    ${HIGH_CPU_TIMEFRAME}    ${HIGH_CPU_TIMEFRAME}
     Set Suite Variable    ${LOW_CPU_PERCENTAGE}    ${LOW_CPU_PERCENTAGE}
