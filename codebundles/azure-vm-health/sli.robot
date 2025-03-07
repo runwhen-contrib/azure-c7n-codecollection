@@ -16,7 +16,10 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Check for VMs With Public IP in resource group `${AZURE_RESOURCE_GROUP}` in Azure Subscription `${AZURE_SUBSCRIPTION_NAME}`
     [Documentation]    Lists VMs with public IP address
-    [Tags]    VM    Azure    Network    Security    access:read-only    
+    [Tags]    VM    Azure    Network    Security    access:read-only 
+    CloudCustodian.Core.Generate Policy   
+    ...    ${CURDIR}/vm-with-public-ip.j2
+    ...    resourceGroup=${AZURE_RESOURCE_GROUP}   
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/vm-with-public-ip.yaml --cache-period 0
     ${count}=    RW.CLI.Run Cli
@@ -31,6 +34,7 @@ Check for VMs With High CPU Usage in resource group `${AZURE_RESOURCE_GROUP}` in
     ...    ${CURDIR}/vm-cpu-usage.j2
     ...    cpu_percentage=${HIGH_CPU_PERCENTAGE}
     ...    timeframe=${HIGH_CPU_TIMEFRAME}
+    ...    resourceGroup=${AZURE_RESOURCE_GROUP}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/vm-cpu-usage.yaml --cache-period 0
     ${count}=    RW.CLI.Run Cli
@@ -58,6 +62,7 @@ Check for Underutilized VMs Based on CPU Usage in resource group `${AZURE_RESOUR
     ...    ${CURDIR}/under-utilized-vm-cpu-usage.j2
     ...    cpu_percentage=${LOW_CPU_PERCENTAGE}
     ...    timeframe=${LOW_CPU_TIMEFRAME}
+    ...    resourceGroup=${AZURE_RESOURCE_GROUP}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/under-utilized-vm-cpu-usage.yaml --cache-period 0
     ${count}=    RW.CLI.Run Cli
@@ -72,6 +77,7 @@ Check for VMs With High Memory Usage in resource group `${AZURE_RESOURCE_GROUP}`
     ...    ${CURDIR}/vm-memory-usage.j2
     ...    memory_percentage=${HIGH_MEMORY_PERCENTAGE}
     ...    timeframe=${HIGH_MEMORY_TIMEFRAME}
+    ...    resourceGroup=${AZURE_RESOURCE_GROUP}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/vm-memory-usage.yaml --cache-period 0
     ${count}=    RW.CLI.Run Cli
@@ -86,6 +92,7 @@ Check for Underutilized VMs Based on Memory Usage in resource group `${AZURE_RES
     ...    ${CURDIR}/vm-memory-usage.j2
     ...    memory_percentage=${LOW_MEMORY_PERCENTAGE}
     ...    timeframe=${LOW_MEMORY_TIMEFRAME}
+    ...    resourceGroup=${AZURE_RESOURCE_GROUP}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/vm-memory-usage.yaml --cache-period 0
     ${count}=    RW.CLI.Run Cli
