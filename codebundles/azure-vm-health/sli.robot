@@ -101,9 +101,22 @@ Check for Underutilized VMs Based on Memory Usage in resource group `${AZURE_RES
     ${underutilized_memory_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_UNDERUTILIZED_VM_MEMORY}) else 0
     Set Global Variable    ${underutilized_memory_score}
 
+Check for Unused Network Interfaces in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+    [Documentation]    Count network interfaces that are not attached to any virtual machine
+    [Tags]    Network    Azure    NIC    Cost    access:read-only
+    CloudCustodian.Core.Generate Policy   
+    ...    ${CURDIR}/unused-nic.j2
+    ...    resourceGroup=${AZURE_RESOURCE_GROUP}
+    ${c7n_output}=    RW.CLI.Run Cli
+    ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/unused-nic.yaml --cache-period 0
+    ${count}=    RW.CLI.Run Cli
+    ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-health/unused-nic/metadata.json | jq '.metrics[] | select(.MetricName == "ResourceCount") | .Value';
+    ${unused_nic_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_UNUSED_NIC}) else 0
+    Set Global Variable    ${unused_nic_score}
+
 
 Generate Health Score
-    ${health_score}=    Evaluate  (${vm_with_public_ip_score} + ${cpu_usage_score} + ${stopped_vm_score} + ${underutilized_vm_score} + ${high_memory_score} + ${underutilized_memory_score}) / 6
+    ${health_score}=    Evaluate  (${vm_with_public_ip_score} + ${cpu_usage_score} + ${stopped_vm_score} + ${underutilized_vm_score} + ${high_memory_score} + ${underutilized_memory_score} + ${unused_nic_score}) / 7
     ${health_score}=    Convert to Number    ${health_score}  2
     RW.Core.Push Metric    ${health_score}
 
@@ -219,6 +232,12 @@ Suite Initialization
     ...    pattern=^\d+$
     ...    example=1
     ...    default=0
+    ${MAX_UNUSED_NIC}=    RW.Core.Import User Variable    MAX_UNUSED_NIC
+    ...    type=string
+    ...    description=The maximum number of unused network interfaces to allow.
+    ...    pattern=^\d+$
+    ...    example=1
+    ...    default=0
     Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${AZURE_SUBSCRIPTION_NAME}
     Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}    ${AZURE_SUBSCRIPTION_ID}
     Set Suite Variable    ${AZURE_RESOURCE_GROUP}    ${AZURE_RESOURCE_GROUP}
@@ -236,3 +255,4 @@ Suite Initialization
     Set Suite Variable    ${LOW_MEMORY_PERCENTAGE}    ${LOW_MEMORY_PERCENTAGE}
     Set Suite Variable    ${LOW_MEMORY_TIMEFRAME}    ${LOW_MEMORY_TIMEFRAME}
     Set Suite Variable    ${MAX_UNDERUTILIZED_VM_MEMORY}    ${MAX_UNDERUTILIZED_VM_MEMORY}
+    Set Suite Variable    ${MAX_UNUSED_NIC}    ${MAX_UNUSED_NIC}
