@@ -1,8 +1,12 @@
 # Azure Virtual Machine Health
 This codebundle runs a suite of metrics checks for VMs in Azure. It identifies:
-- VMs with public IP addresses
-- VMs with high CPU usage
-- Stopped VMs
+- Check for VMs With Public IP
+- Check for Stopped VMs
+- Check for VMs With High CPU Usage
+- Check for Underutilized VMs Based on CPU Usage
+- Check for VMs With High Memory Usage
+- Check for Underutilized VMs Based on Memory
+- Check for Unused Network Interfaces
 
 ## Configuration
 
