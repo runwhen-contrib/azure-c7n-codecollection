@@ -16,3 +16,8 @@ policies:
         aggregation: average
         threshold: 0
         timeframe: {{timeframe}} 
+
+      - type: value
+        key: resourceGroup
+        op: eq
+        value: {{resourceGroup|upper}}

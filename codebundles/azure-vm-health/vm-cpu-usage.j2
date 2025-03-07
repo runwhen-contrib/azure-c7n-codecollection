@@ -13,3 +13,7 @@ policies:
         aggregation: average
         threshold: {{cpu_percentage}}
         timeframe: {{timeframe}}
+      - type: value
+        key: resourceGroup
+        op: eq
+        value: {{resourceGroup|upper}}
