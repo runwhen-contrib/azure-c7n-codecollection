@@ -48,6 +48,7 @@ Check for Stopped VMs in resource group `${AZURE_RESOURCE_GROUP}` in Subscriptio
     CloudCustodian.Core.Generate Policy   
     ...    ${CURDIR}/stopped-vm.j2
     ...    timeframe=${STOPPED_VM_TIMEFRAME}
+    ...    resourceGroup=${AZURE_RESOURCE_GROUP}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/stopped-vm.yaml --cache-period 0
     ${count}=    RW.CLI.Run Cli
