@@ -290,6 +290,45 @@ List Underutilized VMs Based on Memory Usage in resource group `${AZURE_RESOURCE
         RW.Core.Add Pre To Report    "No underutilized VMs based on memory usage found in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
     END
 
+List Unused Network Interfaces in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+    [Documentation]    Lists network interfaces that are not attached to any virtual machine
+    [Tags]    Network    Azure    NIC    Cost    access:read-only
+    CloudCustodian.Core.Generate Policy   
+    ...    ${CURDIR}/unused-nic.j2
+    ...    resourceGroup=${AZURE_RESOURCE_GROUP}
+    ${c7n_output}=    RW.CLI.Run Cli
+    ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/unused-nic.yaml --cache-period 0
+    ${report_data}=    RW.CLI.Run Cli
+    ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-health/unused-nic/resources.json
+
+    TRY
+        ${nic_list}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
+    EXCEPT
+        Log    Failed to load JSON payload, defaulting to empty list.    WARN
+        ${nic_list}=    Create List
+    END
+
+    IF    len(@{nic_list}) > 0
+        ${formatted_results}=    RW.CLI.Run Cli
+        ...    cmd=jq -r '["NIC_Name", "Resource_Group", "Location", "NIC_Link"], (.[] | [ .name, (.resourceGroup | ascii_downcase), .location, ("https://portal.azure.com/#@/resource" + .id + "/overview") ]) | @tsv' ${OUTPUT_DIR}/azure-c7n-vm-health/unused-nic/resources.json | column -t
+        RW.Core.Add Pre To Report    Unused Network Interfaces Summary:\n===============================\n${formatted_results.stdout}
+
+        FOR    ${nic}    IN    @{nic_list}
+            ${pretty_nic}=    Evaluate    pprint.pformat(${nic})    modules=pprint
+            ${resource_group}=    Set Variable    ${nic['resourceGroup'].lower()}
+            ${nic_name}=    Set Variable    ${nic['name']}
+            RW.Core.Add Issue
+            ...    severity=4
+            ...    expected=Network Interface `${nic_name}` should be attached to a virtual machine in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    actual=Network Interface `${nic_name}` is not attached to any virtual machine in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    title=Unused Network Interface `${nic_name}` found in Resource Group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    reproduce_hint=${c7n_output.cmd}
+            ...    details=${pretty_nic}
+            ...    next_steps=Delete the unused network interface to reduce costs in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+        END
+    ELSE
+        RW.Core.Add Pre To Report    "No unused network interfaces found in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
+    END
 
 *** Keywords ***
 Suite Initialization
