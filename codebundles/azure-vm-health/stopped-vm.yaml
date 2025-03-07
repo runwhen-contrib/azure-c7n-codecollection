@@ -1,15 +1,18 @@
 policies:
-  - name: under-utilized-vm-cpu-usage
+  - name: stopped-vms
     resource: azure.vm
     filters:
+      # 1. List only VMs that are stopped (deallocated)
       - type: instance-view
         key: statuses[].code
-        op: not-in
+        op: in
         value_type: swap
         value: PowerState/deallocated
+
+      # 2. Ensure the VM has had 0% CPU usage since 24
       - type: metric
         metric: Percentage CPU
-        op: le
+        op: eq
         aggregation: average
-        threshold: {{cpu_percentage}}
-        timeframe: {{timeframe}}
+        threshold: 0
+        timeframe: 24 

@@ -2,6 +2,11 @@ policies:
   - name: vm-cpu-usage
     resource: azure.vm
     filters:
+      - type: instance-view
+        key: statuses[].code
+        op: not-in
+        value_type: swap
+        value: PowerState/deallocated
       - type: metric
         metric: Percentage CPU
         op: ge
