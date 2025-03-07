@@ -15,7 +15,7 @@ spec:
     value: SLX_PLACEHOLDER
   owners:
   - {{workspace.owner_email}}
-  statement: VM Health should be available.
+  statement: The health of Azure VMs is measured by counts of VMs with public IPs, high CPU/memory usage, stopped/underutilized VMs, and unused NICs/IPs, with a composite score assessing overall health.
   additionalContext:
     name: "{{match_resource.resource.name}}"
     tags: "{{match_resource.tags}}"
