@@ -1,5 +1,5 @@
 *** Settings ***
-Documentation       Count Virtual machines that are publicly accessible and have high CPU usage in Azure  
+Documentation       Count Virtual machines that are publicly accessible, have high CPU usage, underutilized memory, stopped state, unused network interfaces, and unused public IPs in Azure
 Metadata            Author    saurabh3460
 Metadata            Display Name    Azure Virtual Machine Health
 Metadata            Supports    Azure    Virtual Machine    Health    CloudCustodian
