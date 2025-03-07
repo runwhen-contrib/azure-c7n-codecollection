@@ -330,6 +330,46 @@ List Unused Network Interfaces in resource group `${AZURE_RESOURCE_GROUP}` in Su
         RW.Core.Add Pre To Report    "No unused network interfaces found in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
     END
 
+List Unused Public IPs in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+    [Documentation]    Lists public IP addresses that are not attached to any resource
+    [Tags]    Network    Azure    PublicIP    Cost    access:read-only
+    CloudCustodian.Core.Generate Policy   
+    ...    ${CURDIR}/unused-public-ip.j2
+    ...    resourceGroup=${AZURE_RESOURCE_GROUP}
+    ${c7n_output}=    RW.CLI.Run Cli
+    ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/unused-public-ip.yaml --cache-period 0
+    ${report_data}=    RW.CLI.Run Cli
+    ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-health/unused-publicip/resources.json
+
+    TRY
+        ${ip_list}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
+    EXCEPT
+        Log    Failed to load JSON payload, defaulting to empty list.    WARN
+        ${ip_list}=    Create List
+    END
+
+    IF    len(@{ip_list}) > 0
+        ${formatted_results}=    RW.CLI.Run Cli
+        ...    cmd=jq -r '["IP_Name", "Resource_Group", "Location", "IP_Address", "IP_Link"], (.[] | [ .name, (.resourceGroup | ascii_downcase), .location, .properties.ipAddress, ("https://portal.azure.com/#@/resource" + .id + "/overview") ]) | @tsv' ${OUTPUT_DIR}/azure-c7n-vm-health/unused-publicip/resources.json | column -t
+        RW.Core.Add Pre To Report    Unused Public IPs Summary:\n==========================\n${formatted_results.stdout}
+
+        FOR    ${ip}    IN    @{ip_list}
+            ${pretty_ip}=    Evaluate    pprint.pformat(${ip})    modules=pprint
+            ${resource_group}=    Set Variable    ${ip['resourceGroup'].lower()}
+            ${ip_name}=    Set Variable    ${ip['name']}
+            RW.Core.Add Issue
+            ...    severity=4
+            ...    expected=Public IP `${ip_name}` should be attached to a resource in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    actual=Public IP `${ip_name}` is not attached to any resource in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    title=Unused Public IP `${ip_name}` found in Resource Group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    reproduce_hint=${c7n_output.cmd}
+            ...    details=${pretty_ip}
+            ...    next_steps=Delete the unused public IP to reduce costs in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+        END
+    ELSE
+        RW.Core.Add Pre To Report    "No unused public IPs found in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
+    END
+
 *** Keywords ***
 Suite Initialization
     ${azure_credentials}=    RW.Core.Import Secret
