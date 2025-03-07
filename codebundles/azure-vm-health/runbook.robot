@@ -19,6 +19,9 @@ Suite Setup         Suite Initialization
 List VMs With Public IP in resource group `${AZURE_RESOURCE_GROUP}` in Azure Subscription `${AZURE_SUBSCRIPTION_NAME}`
     [Documentation]    Lists VMs with public IP address
     [Tags]    VM    Azure    Network    Security    access:read-only
+    CloudCustodian.Core.Generate Policy   
+    ...    ${CURDIR}/vm-with-public-ip.j2
+    ...    resourceGroup=${AZURE_RESOURCE_GROUP}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/vm-with-public-ip.yaml --cache-period 0
     ${report_data}=    RW.CLI.Run Cli
@@ -59,6 +62,7 @@ List for Stopped VMs in resource group `${AZURE_RESOURCE_GROUP}` in Subscription
     CloudCustodian.Core.Generate Policy   
     ...    ${CURDIR}/stopped-vm.j2
     ...    timeframe=${STOPPED_VM_TIMEFRAME}
+    ...    resourceGroup=${AZURE_RESOURCE_GROUP}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/stopped-vm.yaml --cache-period 0
     ${report_data}=    RW.CLI.Run Cli
@@ -100,6 +104,7 @@ List VMs With High CPU Usage in resource group `${AZURE_RESOURCE_GROUP}` in Subs
     ...    ${CURDIR}/vm-cpu-usage.j2
     ...    cpu_percentage=${HIGH_CPU_PERCENTAGE}
     ...    timeframe=${HIGH_CPU_TIMEFRAME}
+    ...    resourceGroup=${AZURE_RESOURCE_GROUP}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/vm-cpu-usage.yaml --cache-period 0
     ${report_data}=    RW.CLI.Run Cli
@@ -147,6 +152,7 @@ List Underutilized VMs Based on CPU Usage in resource group `${AZURE_RESOURCE_GR
     ...    ${CURDIR}/under-utilized-vm-cpu-usage.j2
     ...    cpu_percentage=${LOW_CPU_PERCENTAGE}
     ...    timeframe=${LOW_CPU_TIMEFRAME}
+    ...    resourceGroup=${AZURE_RESOURCE_GROUP}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/under-utilized-vm-cpu-usage.yaml --cache-period 0
     ${report_data}=    RW.CLI.Run Cli
