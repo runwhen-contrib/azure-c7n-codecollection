@@ -101,6 +101,15 @@ resource "azurerm_network_interface" "unused-nic" {
   tags = var.tags
 }
 
+resource "azurerm_public_ip" "example_unused" {
+  name                = "unused-public-ip"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+  allocation_method   = "Static" # You can also use "Dynamic" if preferred
+  sku                 = "Standard" # "Basic" or "Standard"
+  tags                = var.tags
+}
+
 # Save the private key locally (optional)
 resource "local_file" "private_key" {
   content  = tls_private_key.ssh_key.private_key_pem
