@@ -88,6 +88,19 @@ resource "azurerm_linux_virtual_machine" "vm" {
   # }
 }
 
+resource "azurerm_network_interface" "unused-nic" {
+  name                = "unused-nic"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+
+  ip_configuration {
+    name                          = "example-ip-config"
+    subnet_id                     = azurerm_subnet.subnet.id
+    private_ip_address_allocation = "Dynamic"
+  }
+  tags = var.tags
+}
+
 # Save the private key locally (optional)
 resource "local_file" "private_key" {
   content  = tls_private_key.ssh_key.private_key_pem
