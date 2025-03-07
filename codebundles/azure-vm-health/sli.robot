@@ -115,8 +115,21 @@ Check for Unused Network Interfaces in resource group `${AZURE_RESOURCE_GROUP}` 
     Set Global Variable    ${unused_nic_score}
 
 
+Check for Unused Public IPs in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+    [Documentation]    Count public IP addresses that are not attached to any resource
+    [Tags]    Network    Azure    PublicIP    Cost    access:read-only
+    CloudCustodian.Core.Generate Policy   
+    ...    ${CURDIR}/unused-public-ip.j2
+    ...    resourceGroup=${AZURE_RESOURCE_GROUP}
+    ${c7n_output}=    RW.CLI.Run Cli
+    ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/unused-public-ip.yaml --cache-period 0
+    ${count}=    RW.CLI.Run Cli
+    ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-health/unused-publicip/metadata.json | jq '.metrics[] | select(.MetricName == "ResourceCount") | .Value';
+    ${unused_public_ip_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_UNUSED_PUBLIC_IP}) else 0
+    Set Global Variable    ${unused_public_ip_score}
+
 Generate Health Score
-    ${health_score}=    Evaluate  (${vm_with_public_ip_score} + ${cpu_usage_score} + ${stopped_vm_score} + ${underutilized_vm_score} + ${high_memory_score} + ${underutilized_memory_score} + ${unused_nic_score}) / 7
+    ${health_score}=    Evaluate  (${vm_with_public_ip_score} + ${cpu_usage_score} + ${stopped_vm_score} + ${underutilized_vm_score} + ${high_memory_score} + ${underutilized_memory_score} + ${unused_nic_score} + ${unused_public_ip_score}) / 8
     ${health_score}=    Convert to Number    ${health_score}  2
     RW.Core.Push Metric    ${health_score}
 
@@ -238,6 +251,12 @@ Suite Initialization
     ...    pattern=^\d+$
     ...    example=1
     ...    default=0
+    ${MAX_UNUSED_PUBLIC_IP}=    RW.Core.Import User Variable    MAX_UNUSED_PUBLIC_IP
+    ...    type=string
+    ...    description=The maximum number of unused public IPs to allow.
+    ...    pattern=^\d+$
+    ...    example=1
+    ...    default=0
     Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${AZURE_SUBSCRIPTION_NAME}
     Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}    ${AZURE_SUBSCRIPTION_ID}
     Set Suite Variable    ${AZURE_RESOURCE_GROUP}    ${AZURE_RESOURCE_GROUP}
@@ -256,3 +275,4 @@ Suite Initialization
     Set Suite Variable    ${LOW_MEMORY_TIMEFRAME}    ${LOW_MEMORY_TIMEFRAME}
     Set Suite Variable    ${MAX_UNDERUTILIZED_VM_MEMORY}    ${MAX_UNDERUTILIZED_VM_MEMORY}
     Set Suite Variable    ${MAX_UNUSED_NIC}    ${MAX_UNUSED_NIC}
+    set Suite Variable    ${MAX_UNUSED_PUBLIC_IP}    ${MAX_UNUSED_PUBLIC_IP}
