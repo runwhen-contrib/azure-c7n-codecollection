@@ -7,6 +7,7 @@ This codebundle runs a suite of metrics checks for VMs in Azure. It identifies:
 - Check for VMs With High Memory Usage
 - Check for Underutilized VMs Based on Memory
 - Check for Unused Network Interfaces
+- Check for Unused Public IPs
 
 ## Configuration
 
