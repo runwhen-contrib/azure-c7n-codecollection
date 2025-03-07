@@ -1,9 +1,9 @@
 *** Settings ***
 Documentation       Count Virtual machines that are publicly accessible and have high CPU usage in Azure  
 Metadata            Author    saurabh3460
-Metadata            Display Name    Azure    Virtual Machine    Health
-Metadata            Supports    Azure    Virtual Machine    Health
-Force Tags          Azure    Virtual Machine    Health
+Metadata            Display Name    Azure Virtual Machine Health
+Metadata            Supports    Azure    Virtual Machine    Health    CloudCustodian
+Force Tags          Azure    Virtual Machine    Health    CloudCustodian
 
 Library    String
 Library             BuiltIn
@@ -14,7 +14,7 @@ Library    CloudCustodian.Core
 
 Suite Setup         Suite Initialization
 *** Tasks ***
-Check for VMs With Public IP In Azure Subscription `${AZURE_SUBSCRIPTION_NAME}`
+Check for VMs With Public IP in resource group `${AZURE_RESOURCE_GROUP}` in Azure Subscription `${AZURE_SUBSCRIPTION_NAME}`
     [Documentation]    Lists VMs with public IP address
     [Tags]    VM    Azure    Network    Security    access:read-only    
     ${c7n_output}=    RW.CLI.Run Cli
@@ -24,7 +24,7 @@ Check for VMs With Public IP In Azure Subscription `${AZURE_SUBSCRIPTION_NAME}`
     ${vm_with_public_ip_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_VM_WITH_PUBLIC_IP}) else 0
     Set Global Variable    ${vm_with_public_ip_score}
 
-Check for VMs With High CPU Usage In Subscription `${AZURE_SUBSCRIPTION_NAME}`
+Check for VMs With High CPU Usage in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
     [Documentation]    Checks for VMs with high CPU usage
     [Tags]    VM    Azure    CPU    Performance    access:read-only
     CloudCustodian.Core.Generate Policy   
@@ -38,7 +38,7 @@ Check for VMs With High CPU Usage In Subscription `${AZURE_SUBSCRIPTION_NAME}`
     ${cpu_usage_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_VM_WITH_HIGH_CPU}) else 0
     Set Global Variable    ${cpu_usage_score}
 
-Check for Stopped VMs In Subscription `${AZURE_SUBSCRIPTION_NAME}`
+Check for Stopped VMs in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
     [Documentation]    Count VMs that are in a stopped state
     [Tags]    VM    Azure    State    Cost    access:read-only
     CloudCustodian.Core.Generate Policy   
@@ -51,7 +51,7 @@ Check for Stopped VMs In Subscription `${AZURE_SUBSCRIPTION_NAME}`
     ${stopped_vm_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_STOPPED_VM}) else 0
     Set Global Variable    ${stopped_vm_score}
 
-Check for Underutilized VMs Based on CPU Usage In Subscription `${AZURE_SUBSCRIPTION_NAME}`
+Check for Underutilized VMs Based on CPU Usage in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
     [Documentation]    Count VMs that are underutilized based on CPU usage
     [Tags]    VM    Azure    CPU    Utilization    access:read-only
     CloudCustodian.Core.Generate Policy   
@@ -65,7 +65,7 @@ Check for Underutilized VMs Based on CPU Usage In Subscription `${AZURE_SUBSCRIP
     ${underutilized_vm_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_UNDERUTILIZED_VM}) else 0
     Set Global Variable    ${underutilized_vm_score}
 
-Check for VMs With High Memory Usage In Subscription `${AZURE_SUBSCRIPTION_NAME}`
+Check for VMs With High Memory Usage in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
     [Documentation]    Count VMs that have high memory usage based on available memory percentage
     [Tags]    VM    Azure    Memory    Performance    access:read-only
     CloudCustodian.Core.Generate Policy   
@@ -79,7 +79,7 @@ Check for VMs With High Memory Usage In Subscription `${AZURE_SUBSCRIPTION_NAME}
     ${high_memory_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_VM_WITH_HIGH_MEMORY}) else 0
     Set Global Variable    ${high_memory_score}
 
-Check for Underutilized VMs Based on Memory Usage In Subscription `${AZURE_SUBSCRIPTION_NAME}`
+Check for Underutilized VMs Based on Memory Usage in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
     [Documentation]    Count VMs that are underutilized based on memory usage
     [Tags]    VM    Azure    Memory    Utilization    access:read-only
     CloudCustodian.Core.Generate Policy   
@@ -112,6 +112,15 @@ Suite Initialization
     ...    description=The Azure Subscription ID for the resource.  
     ...    pattern=\w*
     ...    default=""
+    ${AZURE_SUBSCRIPTION_NAME}=    RW.Core.Import User Variable    AZURE_SUBSCRIPTION_NAME
+    ...    type=string
+    ...    description=The Azure Subscription Name.  
+    ...    pattern=\w*
+    ...    default=""
+    ${AZURE_RESOURCE_GROUP}=    RW.Core.Import User Variable    AZURE_RESOURCE_GROUP
+    ...    type=string
+    ...    description=Azure resource group.
+    ...    pattern=\w*
     ${HIGH_CPU_PERCENTAGE}=    RW.Core.Import User Variable    HIGH_CPU_PERCENTAGE
     ...    type=string
     ...    description=The CPU percentage threshold to check for high CPU usage.
@@ -202,10 +211,9 @@ Suite Initialization
     ...    pattern=^\d+$
     ...    example=1
     ...    default=0
-    ${subscription_name}=    RW.CLI.Run Cli
-    ...    cmd=az account show --subscription ${AZURE_SUBSCRIPTION_ID} --query name -o tsv
-    Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${subscription_name.stdout.strip()}
+    Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${AZURE_SUBSCRIPTION_NAME}
     Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}    ${AZURE_SUBSCRIPTION_ID}
+    Set Suite Variable    ${AZURE_RESOURCE_GROUP}    ${AZURE_RESOURCE_GROUP}
     Set Suite Variable    ${HIGH_CPU_PERCENTAGE}    ${HIGH_CPU_PERCENTAGE}
     Set Suite Variable    ${HIGH_CPU_TIMEFRAME}    ${HIGH_CPU_TIMEFRAME}
     Set Suite Variable    ${LOW_CPU_PERCENTAGE}    ${LOW_CPU_PERCENTAGE}
