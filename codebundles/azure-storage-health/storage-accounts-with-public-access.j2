@@ -5,3 +5,7 @@ policies:
       - type: value
         key: properties.networkAcls.defaultAction
         value: "Allow"
+      - type: value
+        key: resourceGroup
+        op: eq
+        value: {{resourceGroup}}
