@@ -9,3 +9,7 @@ policies:
         - type: value
           key: properties.diskState
           value: "Unattached"
+      - type: value
+        key: resourceGroup
+        op: eq
+        value: {{resourceGroup|upper}}
