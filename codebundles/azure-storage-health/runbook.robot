@@ -19,6 +19,9 @@ Suite Setup         Suite Initialization
 List Unused Azure Disks in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
     [Documentation]    List Azure disks that are not attached to any VM
     [Tags]    Disk    Azure    Storage    Cost    access:read-only
+    CloudCustodian.Core.Generate Policy   
+    ...    ${CURDIR}/unused-disk.j2
+    ...    resourceGroup=${AZURE_RESOURCE_GROUP}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-disk-triage ${CURDIR}/unused-disk.yaml --cache-period 0
     ${report_data}=    RW.CLI.Run Cli
@@ -57,6 +60,9 @@ List Unused Azure Disks in resource group `${AZURE_RESOURCE_GROUP}` in Subscript
 List Unused Azure Snapshots in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
     [Documentation]    List Azure snapshots that are not attached
     [Tags]    Snapshot    Azure    Storage    Cost    access:read-only
+    CloudCustodian.Core.Generate Policy   
+    ...    ${CURDIR}/unused-snapshot.j2
+    ...    resourceGroup=${AZURE_RESOURCE_GROUP}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-snapshot-triage ${CURDIR}/unused-snapshot.yaml --cache-period 0
     ${report_data}=    RW.CLI.Run Cli
@@ -98,6 +104,7 @@ List Unused Azure Storage Accounts in resource group `${AZURE_RESOURCE_GROUP}` i
     CloudCustodian.Core.Generate Policy   
     ...    ${CURDIR}/unused-storage-account.j2
     ...    timeframe=${UNUSED_STORAGE_ACCOUNT_TIMEFRAME}
+    ...    resourceGroup=${AZURE_RESOURCE_GROUP}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-storage-triage ${CURDIR}/unused-storage-account.yaml --cache-period 0
     ${report_data}=    RW.CLI.Run Cli
@@ -135,6 +142,9 @@ List Unused Azure Storage Accounts in resource group `${AZURE_RESOURCE_GROUP}` i
 List Public Accessible Azure Storage Accounts in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
     [Documentation]    List Azure storage accounts with public access enabled
     [Tags]    Storage    Azure    Security    access:read-only
+    CloudCustodian.Core.Generate Policy   
+    ...    ${CURDIR}/storage-accounts-with-public-access.j2
+    ...    resourceGroup=${AZURE_RESOURCE_GROUP}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-storage-public-access ${CURDIR}/storage-accounts-with-public-access.yaml --cache-period 0
     ${report_data}=    RW.CLI.Run Cli
