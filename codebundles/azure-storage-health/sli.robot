@@ -17,6 +17,9 @@ Suite Setup         Suite Initialization
 Check for Unused Disks in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
     [Documentation]    Count disks that are not attached to any VM
     [Tags]    Disk    Azure    Storage    Cost    access:read-only
+    CloudCustodian.Core.Generate Policy   
+    ...    ${CURDIR}/unused-disk.j2
+    ...    resourceGroup=${AZURE_RESOURCE_GROUP}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-disk-triage ${CURDIR}/unused-disk.yaml --cache-period 0
     ${count}=    RW.CLI.Run Cli
@@ -27,6 +30,9 @@ Check for Unused Disks in resource group `${AZURE_RESOURCE_GROUP}` in Subscripti
 Check for Unused Snapshots in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
     [Documentation]    Count snapshots that are not attached to any disk
     [Tags]    Snapshot    Azure    Storage    Cost    access:read-only
+    CloudCustodian.Core.Generate Policy   
+    ...    ${CURDIR}/unused-snapshot.j2
+    ...    resourceGroup=${AZURE_RESOURCE_GROUP}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-snapshot-triage ${CURDIR}/unused-snapshot.yaml --cache-period 0
     ${count}=    RW.CLI.Run Cli
@@ -40,6 +46,7 @@ Check for Unused Storage Accounts in resource group `${AZURE_RESOURCE_GROUP}` in
     CloudCustodian.Core.Generate Policy   
     ...    ${CURDIR}/unused-storage-account.j2
     ...    timeframe=${UNUSED_STORAGE_ACCOUNT_TIMEFRAME}
+    ...    resourceGroup=${AZURE_RESOURCE_GROUP}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-storage-triage ${CURDIR}/unused-storage-account.yaml --cache-period 0
     ${count}=    RW.CLI.Run Cli
@@ -51,6 +58,9 @@ Check for Unused Storage Accounts in resource group `${AZURE_RESOURCE_GROUP}` in
 Check for Public Accessible Storage Accounts in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
     [Documentation]    Count storage accounts with public access enabled
     [Tags]    Storage    Azure    Security    access:read-only
+    CloudCustodian.Core.Generate Policy   
+    ...    ${CURDIR}/storage-accounts-with-public-access.j2
+    ...    resourceGroup=${AZURE_RESOURCE_GROUP}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-storage-public-access ${CURDIR}/storage-accounts-with-public-access.yaml --cache-period 0
     ${count}=    RW.CLI.Run Cli
@@ -77,6 +87,10 @@ Suite Initialization
     ...    description=The Azure Subscription ID for the resource.  
     ...    pattern=\w*
     ...    default=""
+    ${AZURE_RESOURCE_GROUP}=    RW.Core.Import User Variable    AZURE_RESOURCE_GROUP
+    ...    type=string
+    ...    description=Azure resource group.
+    ...    pattern=\w*
     ${AZURE_SUBSCRIPTION_NAME}=    RW.Core.Import User Variable    AZURE_SUBSCRIPTION_NAME
     ...    type=string
     ...    description=The Azure Subscription Name.  
@@ -118,3 +132,4 @@ Suite Initialization
     set Suite Variable    ${UNUSED_STORAGE_ACCOUNT_TIMEFRAME}    ${UNUSED_STORAGE_ACCOUNT_TIMEFRAME}
     Set Suite Variable    ${MAX_UNUSED_STORAGE_ACCOUNT}    ${MAX_UNUSED_STORAGE_ACCOUNT}
     Set Suite Variable    ${MAX_PUBLIC_ACCESS_STORAGE_ACCOUNT}    ${MAX_PUBLIC_ACCESS_STORAGE_ACCOUNT}
+    Set Suite Variable    ${AZURE_RESOURCE_GROUP}    ${AZURE_RESOURCE_GROUP}
