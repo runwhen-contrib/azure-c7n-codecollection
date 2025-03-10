@@ -173,7 +173,7 @@ List Public Accessible Azure Storage Accounts in resource group `${AZURE_RESOURC
             ...    title=Public Accessible Azure Storage Account `${storage_name}` found in Resource Group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details=${pretty_storage}
-            ...    next_steps=Consider restricting public access to the storage account to improve security in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    next_steps=Restrict public access to the storage account to improve security in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
         END
     ELSE
         RW.Core.Add Pre To Report    "No public accessible storage accounts found in subscription `${AZURE_SUBSCRIPTION_NAME}`"
