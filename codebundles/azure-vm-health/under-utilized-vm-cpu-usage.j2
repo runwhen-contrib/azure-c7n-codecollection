@@ -1,0 +1,19 @@
+policies:
+  - name: under-utilized-vm-cpu-usage
+    resource: azure.vm
+    filters:
+      - type: instance-view
+        key: statuses[].code
+        op: not-in
+        value_type: swap
+        value: PowerState/deallocated
+      - type: metric
+        metric: Percentage CPU
+        op: le
+        aggregation: average
+        threshold: {{cpu_percentage}}
+        timeframe: {{timeframe}}
+      - type: value
+        key: resourceGroup
+        op: eq
+        value: {{resourceGroup|upper}}
