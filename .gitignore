@@ -49,3 +49,6 @@ build
 **.secret**
 **.pem
 **.pfx
+
+# Ignore SQLite database files
+**/*.sqlite3
