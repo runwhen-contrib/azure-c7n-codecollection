@@ -1,0 +1,8 @@
+policies:
+  - name: mysqlfx-public-access
+    resource: azure.mysql-flexibleserver
+    filters:
+      - type: value
+        key: properties.network.publicNetworkAccess
+        op: eq
+        value: "Enabled"
