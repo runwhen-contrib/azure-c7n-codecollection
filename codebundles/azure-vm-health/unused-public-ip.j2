@@ -1,0 +1,11 @@
+policies:
+  - name: unused-publicip
+    resource: azure.publicip
+    filters:
+      - type: value
+        key: properties.ipConfiguration
+        value: null
+      - type: value
+        key: resourceGroup
+        op: eq
+        value: {{resourceGroup}}
