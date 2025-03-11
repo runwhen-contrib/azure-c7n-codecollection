@@ -8,7 +8,7 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   location: {{default_location}}
-  description: Generates a report for Azure VM Scale Sets and surfaces issues to be actioned.
+  description: List Virtual machines that are publicly accessible, have high CPU usage, underutilized memory, stopped state, unused network interfaces, and unused public IPs in Azure
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
