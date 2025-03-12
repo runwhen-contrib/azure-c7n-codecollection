@@ -1,0 +1,14 @@
+policies:
+  - name: mysqlfx-high-cpu
+    resource: azure.mysql-flexibleserver
+    filters:
+      - type: metric
+        metric: "cpu_percent"
+        op: gt
+        aggregation: average
+        threshold: {{threshold}}
+        timeframe: {{timeframe}}
+      - type: value
+        key: resourceGroup
+        op: eq
+        value: {{resourceGroup}}
