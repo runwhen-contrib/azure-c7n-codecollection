@@ -1,0 +1,12 @@
+policies:
+  - name: mysqlfx-no-replication
+    resource: azure.mysql-flexibleserver
+    filters:
+      - type: value
+        key: properties.replicationRole
+        op: eq
+        value: "None"
+      - type: value
+        key: resourceGroup
+        op: eq
+        value: {{resourceGroup}}

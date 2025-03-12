@@ -1,0 +1,12 @@
+policies:
+  - name: mysqlfx-ha-check
+    resource: azure.mysql-flexibleserver
+    filters:
+      - type: value
+        key: properties.highAvailability.mode
+        op: eq
+        value: "Disabled"
+      - type: value
+        key: resourceGroup
+        op: eq
+        value: {{resourceGroup}}
