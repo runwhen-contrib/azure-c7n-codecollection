@@ -1,0 +1,11 @@
+policies:
+  - name: unused-nic
+    resource: azure.networkinterface
+    filters:
+      - type: value
+        key: properties.virtualMachine
+        value: null
+      - type: value
+        key: resourceGroup
+        op: eq
+        value: {{resourceGroup}}

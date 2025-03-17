@@ -1,0 +1,19 @@
+policies:
+  - name: vm-memory-usage
+    resource: azure.vm
+    filters:
+      - type: instance-view
+        key: statuses[].code
+        op: not-in
+        value_type: swap
+        value: PowerState/deallocated
+      - type: metric
+        metric: Available Memory Percentage
+        op: {{op}} 
+        aggregation: average
+        threshold: {{memory_percentage}}  # Set threshold (e.g., trigger if memory availability is ≤ 20%)
+        timeframe: {{timeframe}}  # Timeframe in hours (e.g., last 24 hours)
+      - type: value
+        key: resourceGroup
+        op: eq
+        value: {{resourceGroup|upper}}
