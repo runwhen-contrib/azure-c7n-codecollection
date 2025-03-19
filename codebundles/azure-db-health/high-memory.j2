@@ -1,0 +1,14 @@
+policies:
+  - name: {{name}}-high-memory
+    resource: {{resource}}
+    filters:
+      - type: metric
+        metric: {{metric}}
+        op: gt
+        aggregation: average
+        threshold: {{threshold}}
+        timeframe: {{timeframe}}
+      - type: value
+        key: resourceGroup
+        op: eq
+        value: {{resourceGroup}}
