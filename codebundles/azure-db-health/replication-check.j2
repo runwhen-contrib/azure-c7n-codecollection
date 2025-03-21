@@ -1,0 +1,12 @@
+policies:
+  - name: {{name}}-replication-check
+    resource: {{resource}}
+    filters:
+      - type: value
+        key: {{key}}
+        op: eq
+        value: {{value}}
+      - type: value
+        key: resourceGroup
+        op: eq
+        value: {{resourceGroup}}

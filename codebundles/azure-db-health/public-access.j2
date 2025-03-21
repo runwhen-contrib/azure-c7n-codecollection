@@ -1,0 +1,13 @@
+policies:
+  - name: {{name}}-public-access
+    resource: {{resource}}
+    filters:
+      - type: value
+        # For SQL Server: properties.publicNetworkAccess
+        key: {{key}}
+        op: eq
+        value: "Enabled"
+      - type: value
+        key: resourceGroup
+        op: eq
+        value: {{resourceGroup}}

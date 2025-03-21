@@ -1,0 +1,46 @@
+{
+    "mysql-flexibleserver": {
+        "resource": "azure.mysql-flexibleserver",
+        "display_name": "MySQL Flexible Server",
+        "publicnetworkaccess": "properties.network.publicNetworkAccess",
+        "ha": {"key": "properties.highAvailability.mode", "value": "Disabled"},
+        "replication": {"key": "properties.replicationRole", "value": "None"},
+        "memory_metric": "memory_percent",
+        "cpu_metric": "cpu_percent"
+    },
+    "sql-database": {
+        "resource": "azure.sql-database",
+        "display_name": "SQL Database",
+        "ha": {"key": "properties.zoneRedundant", "value": "false"},
+        "replication": {"key": "readReplicaCount", "value": "0"},
+        "memory_metric": "memory_percent",
+        "cpu_metric": "cpu_percent"
+    },
+    "sql-server": {
+        "resource": "azure.sqlserver",
+        "display_name": "SQL Server",
+        "publicnetworkaccess": "properties.publicNetworkAccess",
+        "memory_metric": "memory_percent",
+        "cpu_metric": "cpu_percent"
+    },
+    "postgresql-server": {
+        "resource": "azure.postgresql-server",
+        "display_name": "PostgreSQL Server",
+        "publicnetworkaccess": "properties.publicNetworkAccess",
+        "replication": {"key": "replicationRole", "value": ""},
+        "memory_metric": "memory_percent",
+        "cpu_metric": "cpu_percent"
+    },
+    "cosmosdb": {
+        "resource": "azure.cosmosdb",
+        "display_name": "CosmosDB",
+        "publicnetworkaccess": "properties.publicNetworkAccess",
+        "ha": {"key": "properties.enableAutomaticFailover", "value": "false"}
+    },
+    "redis": {
+        "resource": "azure.redis",
+        "display_name": "Redis Cache",
+        "memory_metric": "usedmemorypercentage",
+        "cpu_metric": "percentProcessorTime"
+    }
+}
