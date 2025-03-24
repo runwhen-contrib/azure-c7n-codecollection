@@ -132,7 +132,7 @@ List Databases Without Replication in resource group `${AZURE_RESOURCE_GROUP}` i
                 ...    next_steps=Configure replication for the ${display_name} in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
             END
         ELSE
-            RW.Core.Add Pre To Report    "All ${display_name} have replication configured in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
+            RW.Core.Add Pre To Report    "No ${display_name} without replication configured found in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
         END
     END
 
