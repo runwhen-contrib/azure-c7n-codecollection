@@ -39,7 +39,7 @@ resource "azurerm_postgresql_server" "psql-server" {
   public_network_access_enabled    = true
   ssl_enforcement_enabled          = true
   ssl_minimal_tls_version_enforced = "TLS1_2"
-  tags = var.tags
+  tags                             = var.tags
 }
 
 resource "azurerm_cosmosdb_account" "cosmosdb-account" {
@@ -85,7 +85,7 @@ resource "azurerm_redis_cache" "redis" {
   family               = "C" # Basic Cache family
   sku_name             = "Basic"
   non_ssl_port_enabled = false
-  tags = var.tags
+  tags                 = var.tags
 }
 
 resource "azurerm_mssql_server" "sql_server" {
