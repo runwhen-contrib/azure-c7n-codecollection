@@ -1,0 +1,27 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: azure
+  generationRules:
+    - resourceTypes:
+        - azure_redis_caches
+        - azure_mysql_servers
+        - azure_cosmos_sql_databases
+        - azure_postgresql_databases
+        - azure_mysqlflexibleservers_servers
+        - azure_azurearcdata_sql_server_instances
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: [name]
+          mode: substring
+      slxs:
+        - baseName: az-db-health
+          qualifiers: ["resource_group"]
+          baseTemplateName: azure-db-health
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: azure-db-health-taskset.yaml
