@@ -1,4 +1,4 @@
-resource_group = "custodian-rg"
+resource_group = "azure-storage-health"
 location       = "East US"
 tags = {
   "env" : "test",
