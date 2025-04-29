@@ -91,11 +91,6 @@ Suite Initialization
     ...    type=string
     ...    description=Azure resource group.
     ...    pattern=\w*
-    ${AZURE_SUBSCRIPTION_NAME}=    RW.Core.Import User Variable    AZURE_SUBSCRIPTION_NAME
-    ...    type=string
-    ...    description=The Azure Subscription Name.  
-    ...    pattern=\w*
-    ...    default=""
     ${MAX_UNUSED_DISK}=    RW.Core.Import User Variable    MAX_UNUSED_DISK
     ...    type=string
     ...    description=The maximum number of unused disks allowed in the subscription.
@@ -125,7 +120,9 @@ Suite Initialization
     ...    pattern=^\d+$
     ...    example=1
     ...    default=0
-    Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${AZURE_SUBSCRIPTION_NAME}
+    ${fetch_azure_name}=    RW.CLI.Run Cli
+    ...    cmd= az account list --all --query "[?id=='${AZURE_SUBSCRIPTION_ID}'].name" -o tsv
+    Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${fetch_azure_name.stdout}
     Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}    ${AZURE_SUBSCRIPTION_ID}
     Set Suite Variable    ${MAX_UNUSED_DISK}    ${MAX_UNUSED_DISK}
     Set Suite Variable    ${MAX_UNUSED_SNAPSHOT}    ${MAX_UNUSED_SNAPSHOT}
