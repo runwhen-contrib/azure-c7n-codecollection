@@ -1,0 +1,14 @@
+policies:
+  - name: unused-storage-account
+    resource: azure.storage
+    filters:
+      - type: metric
+        metric: Transactions
+        op: equal
+        threshold: 0
+        timeframe: {{timeframe}}
+        aggregation: total
+      - type: value
+        key: resourceGroup
+        op: eq
+        value: {{resourceGroup}}

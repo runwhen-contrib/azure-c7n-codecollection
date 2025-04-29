@@ -1,0 +1,15 @@
+policies:
+  - name: unused-snapshot
+    resource: azure.snapshot
+    filters:
+      - and:
+        - type: value
+          key: managedBy
+          value: null
+        - type: value
+          key: properties.diskState
+          value: "Unattached"
+      - type: value
+        key: resourceGroup
+        op: eq
+        value: {{resourceGroup|upper}}
