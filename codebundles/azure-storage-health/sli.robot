@@ -14,7 +14,7 @@ Library    CloudCustodian.Core
 
 Suite Setup         Suite Initialization
 *** Tasks ***
-Check for Unused Disks in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+Check for Unused Disks in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Count disks that are not attached to any VM
     [Tags]    Disk    Azure    Storage    Cost    access:read-only
     CloudCustodian.Core.Generate Policy   
@@ -27,7 +27,7 @@ Check for Unused Disks in resource group `${AZURE_RESOURCE_GROUP}` in Subscripti
     ${unused_disk_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_UNUSED_DISK}) else 0
     Set Global Variable    ${unused_disk_score}
 
-Check for Unused Snapshots in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+Check for Unused Snapshots in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Count snapshots that are not attached to any disk
     [Tags]    Snapshot    Azure    Storage    Cost    access:read-only
     CloudCustodian.Core.Generate Policy   
@@ -40,7 +40,7 @@ Check for Unused Snapshots in resource group `${AZURE_RESOURCE_GROUP}` in Subscr
     ${unused_snapshot_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_UNUSED_SNAPSHOT}) else 0
     Set Global Variable    ${unused_snapshot_score}
 
-Check for Unused Storage Accounts in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+Check for Unused Storage Accounts in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Count storage accounts with no transactions
     [Tags]    Storage    Azure    Cost    access:read-only
     CloudCustodian.Core.Generate Policy   
@@ -55,7 +55,7 @@ Check for Unused Storage Accounts in resource group `${AZURE_RESOURCE_GROUP}` in
     Set Global Variable    ${unused_storage_account_score}
 
 
-Check for Public Accessible Storage Accounts in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+Check for Public Accessible Storage Accounts in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Count storage accounts with public access enabled
     [Tags]    Storage    Azure    Security    access:read-only
     CloudCustodian.Core.Generate Policy   
@@ -120,9 +120,6 @@ Suite Initialization
     ...    pattern=^\d+$
     ...    example=1
     ...    default=0
-    ${fetch_azure_name}=    RW.CLI.Run Cli
-    ...    cmd= az account list --all --query "[?id=='${AZURE_SUBSCRIPTION_ID}'].name" -o tsv
-    Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${fetch_azure_name.stdout}
     Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}    ${AZURE_SUBSCRIPTION_ID}
     Set Suite Variable    ${MAX_UNUSED_DISK}    ${MAX_UNUSED_DISK}
     Set Suite Variable    ${MAX_UNUSED_SNAPSHOT}    ${MAX_UNUSED_SNAPSHOT}

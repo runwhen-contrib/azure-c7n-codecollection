@@ -16,7 +16,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-List Unused Azure Disks in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+List Unused Azure Disks in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    List Azure disks that are not attached to any VM
     [Tags]    Disk    Azure    Storage    Cost    access:read-only
     CloudCustodian.Core.Generate Policy   
@@ -46,18 +46,18 @@ List Unused Azure Disks in resource group `${AZURE_RESOURCE_GROUP}` in Subscript
             ${disk_size}=    Set Variable    ${disk['properties']['diskSizeGB']}
             RW.Core.Add Issue
             ...    severity=4
-            ...    expected=Azure disk `${disk_name}` should be attached to a VM in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
-            ...    actual=Azure disk `${disk_name}` is not attached to any VM in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
-            ...    title=Unused Azure Disk `${disk_name}` found in Resource Group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    expected=Azure disk `${disk_name}` should be attached to a VM in resource group `${resource_group}` 
+            ...    actual=Azure disk `${disk_name}` is not attached to any VM in resource group `${resource_group}` 
+            ...    title=Unused Azure Disk `${disk_name}` found in Resource Group `${resource_group}` 
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details=${pretty_disk}
-            ...    next_steps=Delete the unused disk to reduce storage costs in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    next_steps=Delete the unused disk to reduce storage costs in resource group `${AZURE_RESOURCE_GROUP}` 
         END
     ELSE
-        RW.Core.Add Pre To Report    "No unused disks found in subscription `${AZURE_SUBSCRIPTION_NAME}`"
+        RW.Core.Add Pre To Report    "No unused disks found in resource group `${AZURE_RESOURCE_GROUP}`"
     END
 
-List Unused Azure Snapshots in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+List Unused Azure Snapshots in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    List Azure snapshots that are not attached
     [Tags]    Snapshot    Azure    Storage    Cost    access:read-only
     CloudCustodian.Core.Generate Policy   
@@ -87,18 +87,18 @@ List Unused Azure Snapshots in resource group `${AZURE_RESOURCE_GROUP}` in Subsc
             ${snapshot_size}=    Set Variable    ${snapshot['properties']['diskSizeGB']}
             RW.Core.Add Issue
             ...    severity=4
-            ...    expected=Azure snapshot `${snapshot_name}` should be attached to a disk in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
-            ...    actual=Azure snapshot `${snapshot_name}` is not attached to any disk in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
-            ...    title=Unused Azure Snapshot `${snapshot_name}` found in Resource Group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    expected=Azure snapshot `${snapshot_name}` should be attached to a disk in resource group `${resource_group}` 
+            ...    actual=Azure snapshot `${snapshot_name}` is not attached to any disk in resource group `${resource_group}` 
+            ...    title=Unused Azure Snapshot `${snapshot_name}` found in Resource Group `${resource_group}` 
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details=${pretty_snapshot}
-            ...    next_steps=Delete the unused snapshot to reduce storage costs in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    next_steps=Delete the unused snapshot to reduce storage costs in resource group `${AZURE_RESOURCE_GROUP}` 
         END
     ELSE
-        RW.Core.Add Pre To Report    "No unused snapshots found in subscription `${AZURE_SUBSCRIPTION_NAME}`"
+        RW.Core.Add Pre To Report    "No unused snapshots found in resource group `${AZURE_RESOURCE_GROUP}`"
     END
 
-List Unused Azure Storage Accounts in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+List Unused Azure Storage Accounts in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    List Azure storage accounts with no transactions
     [Tags]    Storage    Azure    Cost    access:read-only
     CloudCustodian.Core.Generate Policy   
@@ -128,18 +128,18 @@ List Unused Azure Storage Accounts in resource group `${AZURE_RESOURCE_GROUP}` i
             ${storage_name}=    Set Variable    ${storage['name']}
             RW.Core.Add Issue
             ...    severity=4
-            ...    expected=Azure storage account `${storage_name}` should have transactions in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
-            ...    actual=Azure storage account `${storage_name}` has no transactions in the last `${UNUSED_STORAGE_ACCOUNT_TIMEFRAME}` hours in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
-            ...    title=Unused Azure Storage Account `${storage_name}` found in Resource Group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    expected=Azure storage account `${storage_name}` should have transactions in resource group `${resource_group}` 
+            ...    actual=Azure storage account `${storage_name}` has no transactions in the last `${UNUSED_STORAGE_ACCOUNT_TIMEFRAME}` hours in resource group `${resource_group}` 
+            ...    title=Unused Azure Storage Account `${storage_name}` found in Resource Group `${resource_group}` 
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details=${pretty_storage}
-            ...    next_steps=Delete the unused storage account to reduce storage costs in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    next_steps=Delete the unused storage account to reduce storage costs in resource group `${AZURE_RESOURCE_GROUP}` 
         END
     ELSE
-        RW.Core.Add Pre To Report    "No unused storage accounts found in subscription `${AZURE_SUBSCRIPTION_NAME}`"
+        RW.Core.Add Pre To Report    "No unused storage accounts found in resource group `${AZURE_RESOURCE_GROUP}`"
     END
 
-List Public Accessible Azure Storage Accounts in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+List Public Accessible Azure Storage Accounts in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    List Azure storage accounts with public access enabled
     [Tags]    Storage    Azure    Security    access:read-only
     CloudCustodian.Core.Generate Policy   
@@ -168,15 +168,15 @@ List Public Accessible Azure Storage Accounts in resource group `${AZURE_RESOURC
             ${storage_name}=    Set Variable    ${storage['name']}
             RW.Core.Add Issue
             ...    severity=4
-            ...    expected=Azure storage account `${storage_name}` should have restricted public access in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
-            ...    actual=Azure storage account `${storage_name}` has public access enabled in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
-            ...    title=Public Accessible Azure Storage Account `${storage_name}` found in Resource Group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    expected=Azure storage account `${storage_name}` should have restricted public access in resource group `${resource_group}` 
+            ...    actual=Azure storage account `${storage_name}` has public access enabled in resource group `${resource_group}` 
+            ...    title=Public Accessible Azure Storage Account `${storage_name}` found in Resource Group `${resource_group}` 
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details=${pretty_storage}
-            ...    next_steps=Restrict public access to the storage account to improve security in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    next_steps=Restrict public access to the storage account to improve security in resource group `${AZURE_RESOURCE_GROUP}` in 
         END
     ELSE
-        RW.Core.Add Pre To Report    "No public accessible storage accounts found in subscription `${AZURE_SUBSCRIPTION_NAME}`"
+        RW.Core.Add Pre To Report    "No public accessible storage accounts found in resource group `${AZURE_RESOURCE_GROUP}`"
     END
 
 
@@ -201,9 +201,6 @@ Suite Initialization
     ...    description=The timeframe in hours to check for unused storage accounts (e.g., 720 for 30 days)
     ...    pattern=\d+
     ...    default=24
-    ${fetch_azure_name}=    RW.CLI.Run Cli
-    ...    cmd= az account list --all --query "[?id=='${AZURE_SUBSCRIPTION_ID}'].name" -o tsv
-    Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${fetch_azure_name.stdout}
     Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}    ${AZURE_SUBSCRIPTION_ID}
     Set Suite Variable    ${AZURE_RESOURCE_GROUP}    ${AZURE_RESOURCE_GROUP}
     Set Suite Variable    ${UNUSED_STORAGE_ACCOUNT_TIMEFRAME}    ${UNUSED_STORAGE_ACCOUNT_TIMEFRAME}
