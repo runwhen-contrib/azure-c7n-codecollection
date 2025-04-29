@@ -8,7 +8,7 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/azure/storage/10086-icon-service-Storage-Accounts.svg
-  alias: Azure Storage Health in resource group {{ match_resource.resource_group.name }}
+  alias: {{ match_resource.resource_group.name }} Azure Storage Health
   asMeasuredBy: Composite health score of resources & activities. 
   configProvided:
   - name: SLX_PLACEHOLDER
@@ -22,3 +22,10 @@ spec:
     qualified_name: "{{ match_resource.qualified_name }}"
     resource_group: "{{ match_resource.resource_group.name }}"
     subscription_id: "{{ match_resource.subscription_id }}"
+  tags:
+    - name: cloud
+      value: azure
+    - name: service
+      value: storageaccount
+    - name: access
+      value: read-only

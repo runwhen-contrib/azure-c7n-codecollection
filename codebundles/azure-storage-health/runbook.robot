@@ -51,7 +51,7 @@ List Unused Azure Disks in resource group `${AZURE_RESOURCE_GROUP}`
             ...    title=Unused Azure Disk `${disk_name}` found in Resource Group `${resource_group}` 
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details=${pretty_disk}
-            ...    next_steps=Delete the unused disk to reduce storage costs in resource group `${AZURE_RESOURCE_GROUP}` 
+            ...    next_steps=Delete the unused disk to reduce storage costs in resource group `${resource_group}` 
         END
     ELSE
         RW.Core.Add Pre To Report    "No unused disks found in resource group `${AZURE_RESOURCE_GROUP}`"
@@ -92,7 +92,7 @@ List Unused Azure Snapshots in resource group `${AZURE_RESOURCE_GROUP}`
             ...    title=Unused Azure Snapshot `${snapshot_name}` found in Resource Group `${resource_group}` 
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details=${pretty_snapshot}
-            ...    next_steps=Delete the unused snapshot to reduce storage costs in resource group `${AZURE_RESOURCE_GROUP}` 
+            ...    next_steps=Delete the unused snapshot to reduce storage costs in resource group `${resource_group}` 
         END
     ELSE
         RW.Core.Add Pre To Report    "No unused snapshots found in resource group `${AZURE_RESOURCE_GROUP}`"
@@ -133,7 +133,7 @@ List Unused Azure Storage Accounts in resource group `${AZURE_RESOURCE_GROUP}`
             ...    title=Unused Azure Storage Account `${storage_name}` found in Resource Group `${resource_group}` 
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details=${pretty_storage}
-            ...    next_steps=Delete the unused storage account to reduce storage costs in resource group `${AZURE_RESOURCE_GROUP}` 
+            ...    next_steps=Delete the unused storage account to reduce storage costs in resource group ``${resource_group}` 
         END
     ELSE
         RW.Core.Add Pre To Report    "No unused storage accounts found in resource group `${AZURE_RESOURCE_GROUP}`"
@@ -173,7 +173,7 @@ List Public Accessible Azure Storage Accounts in resource group `${AZURE_RESOURC
             ...    title=Public Accessible Azure Storage Account `${storage_name}` found in Resource Group `${resource_group}` 
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details=${pretty_storage}
-            ...    next_steps=Restrict public access to the storage account to improve security in resource group `${AZURE_RESOURCE_GROUP}` in 
+            ...    next_steps=Restrict public access to the storage account to improve security in resource group `${resource_group}`
         END
     ELSE
         RW.Core.Add Pre To Report    "No public accessible storage accounts found in resource group `${AZURE_RESOURCE_GROUP}`"
