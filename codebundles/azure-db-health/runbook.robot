@@ -16,7 +16,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-List Publicly Accessible Databases in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+List Publicly Accessible Databases in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Lists databases that have public network access enabled
     [Tags]    Database    Azure    Security    access:read-only
     
@@ -64,20 +64,20 @@ List Publicly Accessible Databases in resource group `${AZURE_RESOURCE_GROUP}` i
                 
                 RW.Core.Add Issue
                 ...    severity=4
-                ...    expected=${display_name} `${server_name}` should not have public network access enabled in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
-                ...    actual=${display_name} `${server_name}` has public network access enabled in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
-                ...    title=Publicly Accessible ${display_name} `${server_name}` Detected in Resource Group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+                ...    expected=${display_name} `${server_name}` should not have public network access enabled in resource group `${resource_group}`
+                ...    actual=${display_name} `${server_name}` has public network access enabled in resource group `${resource_group}`
+                ...    title=Publicly Accessible ${display_name} `${server_name}` Detected in Resource Group `${resource_group}`
                 ...    reproduce_hint=${c7n_output.cmd}
                 ...    details=${pretty_server}
-                ...    next_steps=Disable public network access for the ${display_name} in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+                ...    next_steps=Disable public network access for the ${display_name} in resource group `${AZURE_RESOURCE_GROUP}`
             END
         ELSE
-            RW.Core.Add Pre To Report    "No publicly accessible ${display_name} found in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
+            RW.Core.Add Pre To Report    "No publicly accessible ${display_name} found in resource group `${AZURE_RESOURCE_GROUP}`"
         END
     END
 
 
-List Databases Without Replication in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+List Databases Without Replication in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Lists databases that have no replication configured
     [Tags]    Database    Azure    Replication    access:read-only
     
@@ -124,20 +124,20 @@ List Databases Without Replication in resource group `${AZURE_RESOURCE_GROUP}` i
                 ${db_name}=    Set Variable    ${db['name']}
                 RW.Core.Add Issue
                 ...    severity=3
-                ...    expected=${display_name} `${db_name}` should have replication configured in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
-                ...    actual=${display_name} `${db_name}` has no replication configured in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
-                ...    title=${display_name} `${db_name}` Without Replication Detected in Resource Group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+                ...    expected=${display_name} `${db_name}` should have replication configured in resource group `${resource_group}`
+                ...    actual=${display_name} `${db_name}` has no replication configured in resource group `${resource_group}`
+                ...    title=${display_name} `${db_name}` Without Replication Detected in Resource Group `${resource_group}`
                 ...    reproduce_hint=${c7n_output.cmd}
                 ...    details=${pretty_db}
-                ...    next_steps=Configure replication for the ${display_name} in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+                ...    next_steps=Configure replication for the ${display_name} in resource group `${AZURE_RESOURCE_GROUP}`
             END
         ELSE
-            RW.Core.Add Pre To Report    "No ${display_name} without replication configured found in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
+            RW.Core.Add Pre To Report    "No ${display_name} without replication configured found in resource group `${AZURE_RESOURCE_GROUP}`"
         END
     END
 
 
-List Databases Without High Availability in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+List Databases Without High Availability in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Lists databases that have high availability disabled
     [Tags]    Database    Azure    HighAvailability    access:read-only
     
@@ -182,19 +182,19 @@ List Databases Without High Availability in resource group `${AZURE_RESOURCE_GRO
                 ${db_name}=    Set Variable    ${db['name']}
                 RW.Core.Add Issue
                 ...    severity=3
-                ...    expected=${display_name} `${db_name}` should have high availability enabled in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
-                ...    actual=${display_name} `${db_name}` has high availability disabled in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
-                ...    title=${display_name} `${db_name}` Without High Availability Detected in Resource Group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+                ...    expected=${display_name} `${db_name}` should have high availability enabled in resource group `${resource_group}`
+                ...    actual=${display_name} `${db_name}` has high availability disabled in resource group `${resource_group}`
+                ...    title=${display_name} `${db_name}` Without High Availability Detected in Resource Group `${resource_group}`
                 ...    reproduce_hint=${c7n_output.cmd}
                 ...    details=${pretty_db}
-                ...    next_steps=Enable high availability for the ${display_name} in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+                ...    next_steps=Enable high availability for the ${display_name} in resource group `${AZURE_RESOURCE_GROUP}`
             END
         ELSE
-            RW.Core.Add Pre To Report    "No ${display_name} without high availability found in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
+            RW.Core.Add Pre To Report    "No ${display_name} without high availability found in resource group `${AZURE_RESOURCE_GROUP}`"
         END
     END
 
-List Databases With High CPU Usage in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+List Databases With High CPU Usage in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Lists databases that have high CPU usage
     [Tags]    Database    Azure    CPU    access:read-only
     
@@ -244,20 +244,20 @@ List Databases With High CPU Usage in resource group `${AZURE_RESOURCE_GROUP}` i
                 ${cpu_usage}=    Convert To Number    ${cpu_usage_result.stdout}    2
                 RW.Core.Add Issue
                 ...    severity=3
-                ...    expected=${display_name} `${db_name}` should have CPU usage below ${HIGH_CPU_PERCENTAGE}% in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
-                ...    actual=${display_name} `${db_name}` has CPU usage of ${cpu_usage}% in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
-                ...    title=High CPU Usage Detected on ${display_name} `${db_name}` in Resource Group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+                ...    expected=${display_name} `${db_name}` should have CPU usage below ${HIGH_CPU_PERCENTAGE}% in resource group `${resource_group}`
+                ...    actual=${display_name} `${db_name}` has CPU usage of ${cpu_usage}% in resource group `${resource_group}`
+                ...    title=High CPU Usage Detected on ${display_name} `${db_name}` in Resource Group `${resource_group}`
                 ...    reproduce_hint=${c7n_output.cmd}
                 ...    details=${pretty_db}
-                ...    next_steps=Increase the CPU cores for the ${display_name} in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+                ...    next_steps=Increase the CPU cores for the ${display_name} in resource group `${AZURE_RESOURCE_GROUP}`
             END
         ELSE
-            RW.Core.Add Pre To Report    "No ${display_name} with high CPU usage found in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
+            RW.Core.Add Pre To Report    "No ${display_name} with high CPU usage found in resource group `${AZURE_RESOURCE_GROUP}`"
         END
     END
 
 
-List All Databases With High Memory Usage in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+List All Databases With High Memory Usage in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Lists all database types that have high memory usage
     [Tags]    Database    Azure    Memory    access:read-only
     
@@ -306,20 +306,20 @@ List All Databases With High Memory Usage in resource group `${AZURE_RESOURCE_GR
                 ${memory_usage}=    Convert To Number    ${memory_usage_result.stdout}    2
                 RW.Core.Add Issue
                 ...    severity=3
-                ...    expected=${display_name} `${server_name}` should have memory usage below ${HIGH_MEMORY_PERCENTAGE}% in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
-                ...    actual=${display_name} `${server_name}` has memory usage of ${memory_usage}% in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
-                ...    title=High Memory Usage Detected on ${display_name} `${server_name}` in Resource Group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+                ...    expected=${display_name} `${server_name}` should have memory usage below ${HIGH_MEMORY_PERCENTAGE}% in resource group `${resource_group}`
+                ...    actual=${display_name} `${server_name}` has memory usage of ${memory_usage}% in resource group `${resource_group}`
+                ...    title=High Memory Usage Detected on ${display_name} `${server_name}` in Resource Group `${resource_group}`
                 ...    reproduce_hint=${c7n_output.cmd}
                 ...    details=${pretty_server}
-                ...    next_steps=Investigate and optimize the ${display_name}'s memory usage in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+                ...    next_steps=Investigate and optimize the ${display_name}'s memory usage in resource group `${AZURE_RESOURCE_GROUP}`
             END
         ELSE
-            RW.Core.Add Pre To Report    "No ${display_name} with high memory usage found in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
+            RW.Core.Add Pre To Report    "No ${display_name} with high memory usage found in resource group `${AZURE_RESOURCE_GROUP}`"
         END
     END
 
 
-List Redis Caches With High Cache Miss Rate in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+List Redis Caches With High Cache Miss Rate in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Lists Redis caches with high cache miss rate
     [Tags]    Redis    Azure    Cache    access:read-only
     
@@ -366,15 +366,15 @@ List Redis Caches With High Cache Miss Rate in resource group `${AZURE_RESOURCE_
             ${cache_miss_rate}=    Convert To Number    ${cache_miss_result.stdout}    2
             RW.Core.Add Issue
             ...    severity=4
-            ...    expected=${display_name} `${cache_name}` should have low cache miss rate in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
-            ...    actual=${display_name} `${cache_name}` has cache miss rate of ${cache_miss_rate}% in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
-            ...    title=High Cache Miss Rate Detected on ${display_name} `${cache_name}` in Resource Group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    expected=${display_name} `${cache_name}` should have low cache miss rate in resource group `${resource_group}`
+            ...    actual=${display_name} `${cache_name}` has cache miss rate of ${cache_miss_rate}% in resource group `${resource_group}`
+            ...    title=High Cache Miss Rate Detected on ${display_name} `${cache_name}` in Resource Group `${resource_group}`
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details=${pretty_cache}
-            ...    next_steps=Investigate and optimize the ${display_name}'s cache configuration in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    next_steps=Investigate and optimize the ${display_name}'s cache configuration in resource group `${AZURE_RESOURCE_GROUP}`
         END
     ELSE
-        RW.Core.Add Pre To Report    "No ${display_name} with high cache miss rate found in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
+        RW.Core.Add Pre To Report    "No ${display_name} with high cache miss rate found in resource group `${AZURE_RESOURCE_GROUP}`"
     END
 
 
@@ -389,11 +389,6 @@ Suite Initialization
     ${AZURE_SUBSCRIPTION_ID}=    RW.Core.Import User Variable    AZURE_SUBSCRIPTION_ID
     ...    type=string
     ...    description=The Azure Subscription ID for the resource.  
-    ...    pattern=\w*
-    ...    default=""
-    ${AZURE_SUBSCRIPTION_NAME}=    RW.Core.Import User Variable    AZURE_SUBSCRIPTION_NAME
-    ...    type=string
-    ...    description=The Azure Subscription Name.  
     ...    pattern=\w*
     ...    default=""
     ${AZURE_RESOURCE_GROUP}=    RW.Core.Import User Variable    AZURE_RESOURCE_GROUP
@@ -436,7 +431,6 @@ Suite Initialization
     ...    pattern=^\d+$
     ...    example=24
     ...    default=24
-    Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${AZURE_SUBSCRIPTION_NAME}
     Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}    ${AZURE_SUBSCRIPTION_ID}
     Set Suite Variable    ${AZURE_RESOURCE_GROUP}    ${AZURE_RESOURCE_GROUP}
     Set Suite Variable    ${HIGH_CPU_PERCENTAGE}    ${HIGH_CPU_PERCENTAGE}

@@ -14,7 +14,7 @@ Library    CloudCustodian.Core
 
 Suite Setup         Suite Initialization
 *** Tasks ***
-Check for Publicly Accessible Databases in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+Check for Publicly Accessible Databases in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Count databases that have public network access enabled
     [Tags]    Database    Azure    Security    access:read-only
     
@@ -49,7 +49,7 @@ Check for Publicly Accessible Databases in resource group `${AZURE_RESOURCE_GROU
     ${public_db_score}=    Evaluate    1 if int(${total_count}) <= int(${MAX_PUBLIC_DB}) else 0
     Set Global Variable    ${public_db_score}
 
-Check for Databases Without Replication in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+Check for Databases Without Replication in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Count databases that have no replication configured
     [Tags]    Database    Azure    Replication    access:read-only
     
@@ -86,7 +86,7 @@ Check for Databases Without Replication in resource group `${AZURE_RESOURCE_GROU
     ${no_replication_score}=    Evaluate    1 if int(${total_count}) <= int(${MAX_DB_WITHOUT_REPLICATION}) else 0
     Set Global Variable    ${no_replication_score}
 
-Check for Databases Without High Availability in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+Check for Databases Without High Availability in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Count databases that have high availability disabled
     [Tags]    Database    Azure    HighAvailability    access:read-only
     
@@ -123,7 +123,7 @@ Check for Databases Without High Availability in resource group `${AZURE_RESOURC
     ${no_ha_score}=    Evaluate    1 if int(${total_count}) <= int(${MAX_DB_WITHOUT_HA}) else 0
     Set Global Variable    ${no_ha_score}
 
-Check for Databases With High CPU Usage in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+Check for Databases With High CPU Usage in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Count databases that have high CPU usage
     [Tags]    Database    Azure    CPU    access:read-only
     
@@ -161,7 +161,7 @@ Check for Databases With High CPU Usage in resource group `${AZURE_RESOURCE_GROU
     ${high_cpu_score}=    Evaluate    1 if int(${total_count}) <= int(${MAX_HIGH_CPU_DB}) else 0
     Set Global Variable    ${high_cpu_score}
 
-Check for Databases With High Memory Usage in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+Check for Databases With High Memory Usage in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Count databases that have high memory usage
     [Tags]    Database    Azure    Memory    access:read-only
     
@@ -200,7 +200,7 @@ Check for Databases With High Memory Usage in resource group `${AZURE_RESOURCE_G
     Set Global Variable    ${high_memory_score}
 
 
-List Redis Caches With High Cache Miss Rate in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+List Redis Caches With High Cache Miss Rate in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Count Redis caches that have high cache miss rate
     [Tags]    Database    Azure    Redis    Cache    access:read-only
     ${policy_name}    Set Variable    redis-cache-miss
@@ -234,11 +234,6 @@ Suite Initialization
     ${AZURE_SUBSCRIPTION_ID}=    RW.Core.Import User Variable    AZURE_SUBSCRIPTION_ID
     ...    type=string
     ...    description=The Azure Subscription ID for the resource.  
-    ...    pattern=\w*
-    ...    default=""
-    ${AZURE_SUBSCRIPTION_NAME}=    RW.Core.Import User Variable    AZURE_SUBSCRIPTION_NAME
-    ...    type=string
-    ...    description=The Azure Subscription Name.  
     ...    pattern=\w*
     ...    default=""
     ${AZURE_RESOURCE_GROUP}=    RW.Core.Import User Variable    AZURE_RESOURCE_GROUP
@@ -317,7 +312,6 @@ Suite Initialization
     ...    pattern=^\d+$
     ...    example=24
     ...    default=24
-    Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${AZURE_SUBSCRIPTION_NAME}
     Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}    ${AZURE_SUBSCRIPTION_ID}
     Set Suite Variable    ${AZURE_RESOURCE_GROUP}    ${AZURE_RESOURCE_GROUP}
     Set Suite Variable    ${MAX_PUBLIC_DB}    ${MAX_PUBLIC_DB}
