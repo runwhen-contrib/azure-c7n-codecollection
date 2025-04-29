@@ -1,4 +1,4 @@
-resource_group = "cloudcustodian"
+resource_group = "azure-db-health"
 location       = "Central India"
 tags = {
   "env" : "test",

@@ -7,8 +7,8 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
-  imageURL: https://placeholder.svg
-  alias: Azure Database Health in resource group {{ match_resource.resource_group.name }} in azure subscription {{ custom.subscription_name }}
+  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/azure/databases/10135-icon-service-Managed-Database.svg
+  alias:  {{ match_resource.resource_group.name }} Azure Database Health
   asMeasuredBy: Composite health score of resources & activities. 
   configProvided:
   - name: SLX_PLACEHOLDER
@@ -22,3 +22,10 @@ spec:
     qualified_name: "{{ match_resource.qualified_name }}"
     resource_group: "{{ match_resource.resource_group.name }}"
     subscription_id: "{{ match_resource.subscription_id }}"
+  tags:
+    - name: cloud
+      value: azure
+    - name: service
+      value: database
+    - name: access
+      value: read-only
