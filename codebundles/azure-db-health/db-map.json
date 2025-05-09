@@ -14,7 +14,8 @@
         "ha": {"key": "properties.zoneRedundant", "value": "false"},
         "replication": {"key": "readReplicaCount", "value": "0"},
         "memory_metric": "memory_percent",
-        "cpu_metric": "cpu_percent"
+        "cpu_metric": "cpu_percent",
+        "availability": "availability"
     },
     "sql-server": {
         "resource": "azure.sqlserver",
@@ -35,7 +36,8 @@
         "resource": "azure.cosmosdb",
         "display_name": "CosmosDB",
         "publicnetworkaccess": "properties.publicNetworkAccess",
-        "ha": {"key": "properties.enableAutomaticFailover", "value": "false"}
+        "ha": {"key": "properties.enableAutomaticFailover", "value": "false"},
+        "availability": "ServiceAvailability"
     },
     "redis": {
         "resource": "azure.redis",
