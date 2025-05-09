@@ -1,5 +1,5 @@
 *** Settings ***
-Documentation       Count databases that are publicly accessible, without replication, without high availability configuration, with high CPU usage, high memory usage, and high cache miss rate in Azure
+Documentation       Count databases that are publicly accessible, without replication, without high availability configuration, with high CPU usage, high memory usage, high cache miss rate, and low availability in Azure
 Metadata            Author    saurabh3460
 Metadata            Display Name    Azure Database Health
 Metadata            Supports    Azure    Database    Health    CloudCustodian
@@ -14,7 +14,44 @@ Library    CloudCustodian.Core
 
 Suite Setup         Suite Initialization
 *** Tasks ***
-Check for Publicly Accessible Databases in resource group `${AZURE_RESOURCE_GROUP}`
+Count Database Availability in resource group `${AZURE_RESOURCE_GROUP}`
+    [Documentation]    Count databases that have availability below 100%
+    [Tags]    Database    Azure    Availability    access:read-only
+    ${db_map}=    Evaluate    json.load(open('${CURDIR}/db-map.json'))    json
+    ${total_count}=    Set Variable    0
+    
+    FOR    ${db_type}    IN    @{db_map.keys()}
+        ${db_info}=    Set Variable    ${db_map['${db_type}']}
+        Continue For Loop If    'availability' not in ${db_info}
+        
+        ${policy_name}=    Set Variable    ${db_type}-availability
+        ${display_name}=    Set Variable    ${db_info['display_name']}
+        ${availability_metric}=    Set Variable    ${db_info['availability']}
+        
+        CloudCustodian.Core.Generate Policy   
+        ...    availability.j2        
+        ...    name=${db_type}
+        ...    resource=${db_info['resource']}
+        ...    metric=${availability_metric}
+        ...    resourceGroup=${AZURE_RESOURCE_GROUP}
+        ...    threshold=${LOW_AVAILABILITY_THRESHOLD}
+        ...    timeframe=${LOW_AVAILABILITY_TIMEFRAME}
+        ...    interval=${LOW_AVAILABILITY_INTERVAL}
+        
+        ${c7n_output}=    RW.CLI.Run Cli
+        ...    cmd=custodian run -s azure-c7n-db-health availability.yaml --cache-period 0
+        
+        ${count}=    RW.CLI.Run Cli
+        ...    cmd=cat azure-c7n-db-health/${policy_name}/metadata.json | jq '.metrics[] | select(.MetricName == "ResourceCount") | .Value';
+        
+        ${total_count}=    Evaluate    ${total_count} + int(${count.stdout})
+        
+        RW.CLI.Run Cli    cmd=rm availability.yaml    # Remove generated policy
+    END
+    ${low_availability_score}=    Evaluate    1 if int(${total_count}) <= int(${MAX_LOW_AVAILABILITY_DB}) else 0
+    Set Global Variable    ${low_availability_score}
+
+Count Publicly Accessible Databases in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Count databases that have public network access enabled
     [Tags]    Database    Azure    Security    access:read-only
     
@@ -49,7 +86,7 @@ Check for Publicly Accessible Databases in resource group `${AZURE_RESOURCE_GROU
     ${public_db_score}=    Evaluate    1 if int(${total_count}) <= int(${MAX_PUBLIC_DB}) else 0
     Set Global Variable    ${public_db_score}
 
-Check for Databases Without Replication in resource group `${AZURE_RESOURCE_GROUP}`
+Count Databases Without Replication in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Count databases that have no replication configured
     [Tags]    Database    Azure    Replication    access:read-only
     
@@ -86,7 +123,7 @@ Check for Databases Without Replication in resource group `${AZURE_RESOURCE_GROU
     ${no_replication_score}=    Evaluate    1 if int(${total_count}) <= int(${MAX_DB_WITHOUT_REPLICATION}) else 0
     Set Global Variable    ${no_replication_score}
 
-Check for Databases Without High Availability in resource group `${AZURE_RESOURCE_GROUP}`
+Count Databases Without High Availability in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Count databases that have high availability disabled
     [Tags]    Database    Azure    HighAvailability    access:read-only
     
@@ -123,7 +160,7 @@ Check for Databases Without High Availability in resource group `${AZURE_RESOURC
     ${no_ha_score}=    Evaluate    1 if int(${total_count}) <= int(${MAX_DB_WITHOUT_HA}) else 0
     Set Global Variable    ${no_ha_score}
 
-Check for Databases With High CPU Usage in resource group `${AZURE_RESOURCE_GROUP}`
+Count Databases With High CPU Usage in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Count databases that have high CPU usage
     [Tags]    Database    Azure    CPU    access:read-only
     
@@ -161,7 +198,7 @@ Check for Databases With High CPU Usage in resource group `${AZURE_RESOURCE_GROU
     ${high_cpu_score}=    Evaluate    1 if int(${total_count}) <= int(${MAX_HIGH_CPU_DB}) else 0
     Set Global Variable    ${high_cpu_score}
 
-Check for Databases With High Memory Usage in resource group `${AZURE_RESOURCE_GROUP}`
+Count Databases With High Memory Usage in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Count databases that have high memory usage
     [Tags]    Database    Azure    Memory    access:read-only
     
@@ -200,7 +237,7 @@ Check for Databases With High Memory Usage in resource group `${AZURE_RESOURCE_G
     Set Global Variable    ${high_memory_score}
 
 
-List Redis Caches With High Cache Miss Rate in resource group `${AZURE_RESOURCE_GROUP}`
+Count Redis Caches With High Cache Miss Rate in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Count Redis caches that have high cache miss rate
     [Tags]    Database    Azure    Redis    Cache    access:read-only
     ${policy_name}    Set Variable    redis-cache-miss
@@ -219,7 +256,7 @@ List Redis Caches With High Cache Miss Rate in resource group `${AZURE_RESOURCE_
 
 
 Generate Health Score
-    ${health_score}=    Evaluate  (${public_db_score} + ${no_replication_score} + ${no_ha_score} + ${high_cpu_score} + ${high_memory_score} + ${high_cache_miss_score}) / 6
+    ${health_score}=    Evaluate  (${public_db_score} + ${no_replication_score} + ${no_ha_score} + ${high_cpu_score} + ${high_memory_score} + ${high_cache_miss_score} + ${low_availability_score}) / 7
     ${health_score}=    Convert to Number    ${health_score}  2
     RW.Core.Push Metric    ${health_score}
 
@@ -312,6 +349,30 @@ Suite Initialization
     ...    pattern=^\d+$
     ...    example=24
     ...    default=24
+    ${LOW_AVAILABILITY_THRESHOLD}=    RW.Core.Import User Variable    LOW_AVAILABILITY_THRESHOLD
+    ...    type=string
+    ...    description=The availability percentage threshold to check for low availability.
+    ...    pattern=^\d+$
+    ...    example=100
+    ...    default=100
+    ${LOW_AVAILABILITY_TIMEFRAME}=    RW.Core.Import User Variable    LOW_AVAILABILITY_TIMEFRAME
+    ...    type=string
+    ...    description=The timeframe to check for low availability in hours.
+    ...    pattern=^\d+$
+    ...    example=24
+    ...    default=24
+    ${MAX_LOW_AVAILABILITY_DB}=    RW.Core.Import User Variable    MAX_LOW_AVAILABILITY_DB
+    ...    type=string
+    ...    description=The maximum number of database with low availability to allow.
+    ...    pattern=^\d+$
+    ...    example=0
+    ...    default=0
+    ${LOW_AVAILABILITY_INTERVAL}=    RW.Core.Import User Variable    LOW_AVAILABILITY_INTERVAL
+    ...    type=string
+    ...    description=The interval to check for low availability in this formats PT1H, PT1M, PT1S etc.
+    ...    pattern=^\w+$
+    ...    example=PT1H
+    ...    default=PT1H
     Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}    ${AZURE_SUBSCRIPTION_ID}
     Set Suite Variable    ${AZURE_RESOURCE_GROUP}    ${AZURE_RESOURCE_GROUP}
     Set Suite Variable    ${MAX_PUBLIC_DB}    ${MAX_PUBLIC_DB}
@@ -326,3 +387,7 @@ Suite Initialization
     Set Suite Variable    ${HIGH_CPU_TIMEFRAME}    ${HIGH_CPU_TIMEFRAME}
     Set Suite Variable    ${HIGH_MEMORY_PERCENTAGE}    ${HIGH_MEMORY_PERCENTAGE}
     Set Suite Variable    ${HIGH_MEMORY_TIMEFRAME}    ${HIGH_MEMORY_TIMEFRAME}
+    Set Suite Variable    ${LOW_AVAILABILITY_THRESHOLD}    ${LOW_AVAILABILITY_THRESHOLD}
+    Set Suite Variable    ${LOW_AVAILABILITY_TIMEFRAME}    ${LOW_AVAILABILITY_TIMEFRAME}
+    Set Suite Variable    ${MAX_LOW_AVAILABILITY_DB}    ${MAX_LOW_AVAILABILITY_DB}
+    Set Suite Variable    ${LOW_AVAILABILITY_INTERVAL}    ${LOW_AVAILABILITY_INTERVAL}
