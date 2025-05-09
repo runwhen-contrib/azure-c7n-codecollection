@@ -254,9 +254,49 @@ Count Redis Caches With High Cache Miss Rate in resource group `${AZURE_RESOURCE
     Set Global Variable    ${high_cache_miss_score}
     RW.CLI.Run Cli    cmd=rm ${CURDIR}/${policy_name}.yaml    # Remove generated policy
 
+Count Databases With Health Issues in resource group `${AZURE_RESOURCE_GROUP}`
+    [Documentation]    Count databases that have health issues using Azure ResourceHealth API
+    [Tags]    Database    Azure    Health    ResourceHealth    access:read-only
+    
+    # Run the get-db-health.sh script to retrieve health status
+    ${script_result}=    RW.CLI.Run Bash File
+    ...    bash_file=get-db-health.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ...    show_in_rwl_cheatsheet=true
+    
+    # Load the health data from the generated JSON file
+    ${health_data}=    RW.CLI.Run Cli
+    ...    cmd=cat db_health.json
+    
+    TRY
+        ${health_list}=    Evaluate    json.loads(r'''${health_data.stdout}''')    json
+    EXCEPT
+        Log    Failed to load JSON payload, defaulting to empty list.    WARN
+        ${health_list}=    Create List
+    END
+    
+    # Count unhealthy databases
+    ${unhealthy_count}=    Set Variable    0
+    ${total_count}=    Evaluate    len(@{health_list})
+    
+    FOR    ${db}    IN    @{health_list}
+        ${availability_state}=    Set Variable    ${db['properties']['availabilityState']}
+        
+        # Count if not Available
+        IF    '${availability_state}' != 'Available'
+            ${unhealthy_count}=    Evaluate    ${unhealthy_count} + 1
+        END
+    END
+    
+    # Calculate health score based on unhealthy databases
+    ${db_health_score}=    Evaluate    1 if int(${unhealthy_count}) <= int(${MAX_UNHEALTHY_DB}) else 0
+    Set Global Variable    ${db_health_score}
+
 
 Generate Health Score
-    ${health_score}=    Evaluate  (${public_db_score} + ${no_replication_score} + ${no_ha_score} + ${high_cpu_score} + ${high_memory_score} + ${high_cache_miss_score} + ${low_availability_score}) / 7
+    ${health_score}=    Evaluate  (${public_db_score} + ${no_replication_score} + ${no_ha_score} + ${high_cpu_score} + ${high_memory_score} + ${high_cache_miss_score} + ${low_availability_score} + ${db_health_score}) / 8
     ${health_score}=    Convert to Number    ${health_score}  2
     RW.Core.Push Metric    ${health_score}
 
@@ -280,6 +320,12 @@ Suite Initialization
     ${MAX_PUBLIC_DB}=    RW.Core.Import User Variable    MAX_PUBLIC_DB
     ...    type=string
     ...    description=The maximum number of database with public access to allow.
+    ...    pattern=^\d+$
+    ...    example=0
+    ...    default=0
+    ${MAX_UNHEALTHY_DB}=    RW.Core.Import User Variable    MAX_UNHEALTHY_DB
+    ...    type=string
+    ...    description=The maximum number of unhealthy databases to allow.
     ...    pattern=^\d+$
     ...    example=0
     ...    default=0
@@ -391,3 +437,7 @@ Suite Initialization
     Set Suite Variable    ${LOW_AVAILABILITY_TIMEFRAME}    ${LOW_AVAILABILITY_TIMEFRAME}
     Set Suite Variable    ${MAX_LOW_AVAILABILITY_DB}    ${MAX_LOW_AVAILABILITY_DB}
     Set Suite Variable    ${LOW_AVAILABILITY_INTERVAL}    ${LOW_AVAILABILITY_INTERVAL}
+    Set Suite Variable    ${MAX_UNHEALTHY_DB}    ${MAX_UNHEALTHY_DB}
+    Set Suite Variable
+    ...    ${env}
+    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}"}
