@@ -11,6 +11,7 @@ Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
 Library    CloudCustodian.Core
+Library    Collections
 
 Suite Setup         Suite Initialization
 
@@ -441,6 +442,81 @@ List Redis Caches With High Cache Miss Rate in resource group `${AZURE_RESOURCE_
     END
 
 
+List Database Resource Health in resource group `${AZURE_RESOURCE_GROUP}`
+    [Documentation]    Lists unhealthy databases using Azure ResourceHealth API
+    [Tags]    Database    Azure    Health    ResourceHealth    access:read-only
+    ${json_file}=    Set Variable    db_health.json
+    # Run the get-db-health.sh script to retrieve health status
+    ${script_result}=    RW.CLI.Run Bash File
+    ...    bash_file=get-db-health.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ...    show_in_rwl_cheatsheet=true
+    
+    # Load the health data from the generated JSON file
+    ${health_data}=    RW.CLI.Run Cli
+    ...    cmd=cat db_health.json
+    
+    TRY
+        ${health_list}=    Evaluate    json.loads(r'''${health_data.stdout}''')    json
+    EXCEPT
+        Log    Failed to load JSON payload, defaulting to empty list.    WARN
+        ${health_list}=    Create List
+    END
+    
+    # Filter for unhealthy databases
+    ${unhealthy_dbs}=    Create List
+    ${total_count}=    Evaluate    len(@{health_list})
+    
+    FOR    ${db}    IN    @{health_list}
+        ${availability_state}=    Set Variable    ${db['properties']['availabilityState']}
+        
+        # Add to unhealthy list if not Available
+        IF    '${availability_state}' != 'Available'
+            Append To List    ${unhealthy_dbs}    ${db}
+        END
+    END
+
+    ${formatted_results}=    RW.CLI.Run Cli
+    ...    cmd=jq -r '["DatabaseName", "Type", "ResourceGroup", "Status", "Reason"] as $headers | [$headers] + [.[] | [.dbName, (.displayName | gsub(" "; "_")), "${AZURE_RESOURCE_GROUP}", .properties.availabilityState, (.properties.reasonType // "Unknown")]] | .[] | @tsv' ${json_file} | column -t
+    RW.Core.Add Pre To Report    Unhealthy Databases:\n=====================================================\n${formatted_results.stdout}
+
+    # Report on unhealthy databases and add issues
+    IF    len(@{unhealthy_dbs}) > 0
+        # Write unhealthy databases to a temporary JSON file for jq processing
+        ${unhealthy_json}=    Evaluate    json.dumps(${unhealthy_dbs})    json
+        
+        # Use jq to format the table
+        FOR    ${db}    IN    @{unhealthy_dbs}
+            ${pretty_db}=    Evaluate    pprint.pformat(${db})    modules=pprint
+            ${resource_group}=    Set Variable    ${AZURE_RESOURCE_GROUP}
+            ${db_name}=    Set Variable    ${db['dbName']}
+            ${display_name}=    Set Variable    ${db['displayName']}
+            ${status}=    Set Variable    ${db['properties']['availabilityState']}
+            RW.Core.Add Issue
+            ...    severity=3
+            ...    expected=${display_name} `${db_name}` should be available in resource group `${resource_group}`
+            ...    actual=${display_name} `${db_name}` is in ${status} state in resource group `${resource_group}`
+            ...    title=Unhealthy Database Detected: ${display_name} `${db_name}` in Resource Group `${resource_group}`
+            ...    details=${pretty_db}
+            ...    reproduce_hint=${script_result.cmd}
+            ...    next_steps=Investigate the database health issue in Azure Portal: https://portal.azure.com/#@/resource${db['id']}/overview
+        END
+        
+        # Clean up temporary file
+        RW.CLI.Run Cli
+        ...    cmd=rm unhealthy_dbs.json
+    ELSE
+        RW.Core.Add Pre To Report    No unhealthy databases found in resource group `${AZURE_RESOURCE_GROUP}`
+    END
+    
+    # Summary
+    ${unhealthy_count}=    Evaluate    len(@{unhealthy_dbs})
+    ${healthy_count}=    Evaluate    ${total_count} - ${unhealthy_count}
+    
+    RW.Core.Add Pre To Report    Database Health Summary:\n=====================================================\nTotal Databases: ${total_count}\nHealthy Databases: ${healthy_count}\nUnhealthy Databases: ${unhealthy_count}
+
 
 *** Keywords ***
 Suite Initialization
@@ -523,3 +599,6 @@ Suite Initialization
     Set Suite Variable    ${LOW_AVAILABILITY_THRESHOLD}    ${LOW_AVAILABILITY_THRESHOLD}
     Set Suite Variable    ${LOW_AVAILABILITY_TIMEFRAME}    ${LOW_AVAILABILITY_TIMEFRAME}
     Set Suite Variable    ${LOW_AVAILABILITY_INTERVAL}    ${LOW_AVAILABILITY_INTERVAL}
+    Set Suite Variable
+    ...    ${env}
+    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}"}
