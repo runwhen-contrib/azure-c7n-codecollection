@@ -1,9 +1,9 @@
 *** Settings ***
-Documentation       List databases that are publicly accessible, without replication, without high availability configuration, with high CPU usage, high memory usage, and high cache miss rate in Azure
+Documentation       List databases that are publicly accessible, without replication, without high availability configuration, with high CPU usage, high memory usage, high cache miss rate, and low availability in Azure
 Metadata            Author    saurabh3460
 Metadata            Display Name    Azure Database Health
 Metadata            Supports    Azure    Database    Health    CloudCustodian
-Force Tags          Azure    Database    Health    CloudCustodian    cosmosdb    sql    redis    postgresql
+Force Tags          Azure    Database    Health    CloudCustodian    cosmosdb    sql    redis    postgresql    availability
 
 Library    String
 Library             BuiltIn
@@ -16,6 +16,69 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
+List Database Availability in resource group `${AZURE_RESOURCE_GROUP}`
+    [Documentation]    Lists databases that have availability below 100%
+    [Tags]    Database    Azure    Availability    access:read-only
+    ${db_map}=    Evaluate    json.load(open('db-map.json'))    json
+    
+    FOR    ${db_type}    IN    @{db_map.keys()}
+        ${db_info}=    Set Variable    ${db_map['${db_type}']}
+        Continue For Loop If    'availability' not in ${db_info}
+        ${policy_name}=    Set Variable    ${db_type}-availability
+        ${display_name}=    Set Variable    ${db_info['display_name']}
+        ${availability_metric}=    Set Variable    ${db_info['availability']}
+        
+        CloudCustodian.Core.Generate Policy   
+        ...    availability.j2        
+        ...    name=${db_type}
+        ...    resource=${db_info['resource']}
+        ...    metric=${availability_metric}
+        ...    resourceGroup=${AZURE_RESOURCE_GROUP}
+        ...    threshold=${LOW_AVAILABILITY_THRESHOLD}
+        ...    timeframe=${LOW_AVAILABILITY_TIMEFRAME}
+        ...    interval=${LOW_AVAILABILITY_INTERVAL}    
+        ${c7n_output}=    RW.CLI.Run Cli
+        ...    cmd=custodian run -s azure-c7n-db-health availability.yaml --cache-period 0
+        
+        ${report_data}=    RW.CLI.Run Cli
+        ...    cmd=cat azure-c7n-db-health/${policy_name}/resources.json
+        
+        RW.CLI.Run Cli    cmd=rm availability.yaml        # Remove generated policy
+        
+        TRY
+            ${db_list}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
+        EXCEPT
+            Log    Failed to load JSON payload, defaulting to empty list.    WARN
+            ${db_list}=    Create List
+        END
+
+        IF    len(@{db_list}) > 0
+            ${formatted_results}=    RW.CLI.Run Cli
+            ...    cmd=jq -r '["DB_Name", "Resource_Group", "Location", "Availability%", "DB_Link"], (.[] | [ .name, (.resourceGroup | ascii_downcase), (.location | gsub(" "; "_")), (."c7n:metrics" | to_entries | map(.value.measurement[-1]) | first // 0 | tonumber | (. * 100 | round / 100) | tostring), ("https://portal.azure.com/#@/resource" + .id + "/overview") ]) | @tsv' ${OUTPUT_DIR}/azure-c7n-db-health/${policy_name}/resources.json | column -t
+            RW.Core.Add Pre To Report    ${display_name} With Low Availability Summary:\n=====================================================\n${formatted_results.stdout}
+            
+            FOR    ${db}    IN    @{db_list}
+                ${pretty_db}=    Evaluate    pprint.pformat(${db})    modules=pprint
+                ${resource_group}=    Set Variable    ${db['resourceGroup'].lower()}
+                ${db_name}=    Set Variable    ${db['name']}
+                ${json_str}=    Evaluate    json.dumps(${db})    json
+                ${availability_result}=    RW.CLI.Run Cli
+                ...    cmd=echo '${json_str}' | jq -r '(."c7n:metrics" | to_entries | map(.value.measurement[0]) | first // "0")'
+                ${availability}=    Convert To Number    ${availability_result.stdout}    2
+                RW.Core.Add Issue
+                ...    severity=3
+                ...    expected=${display_name} `${db_name}` should have availability above 99.99% in resource group `${resource_group}`
+                ...    actual=${display_name} `${db_name}` has availability of ${availability}% in resource group `${resource_group}`
+                ...    title=Low Availability Detected on ${display_name} `${db_name}` in Resource Group `${resource_group}`
+                ...    reproduce_hint=${c7n_output.cmd}
+                ...    details=${pretty_db}
+                ...    next_steps=Investigate and resolve the availability issues for the ${display_name} in resource group `${AZURE_RESOURCE_GROUP}`
+            END
+        ELSE
+            RW.Core.Add Pre To Report    "No ${display_name} with low availability found in resource group `${AZURE_RESOURCE_GROUP}`"
+        END
+    END
+
 List Publicly Accessible Databases in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Lists databases that have public network access enabled
     [Tags]    Database    Azure    Security    access:read-only
@@ -431,6 +494,24 @@ Suite Initialization
     ...    pattern=^\d+$
     ...    example=24
     ...    default=24
+    ${LOW_AVAILABILITY_THRESHOLD}=    RW.Core.Import User Variable    LOW_AVAILABILITY_THRESHOLD
+    ...    type=string
+    ...    description=The availability percentage threshold to check for low availability.
+    ...    pattern=^\d+$
+    ...    example=100
+    ...    default=100
+    ${LOW_AVAILABILITY_TIMEFRAME}=    RW.Core.Import User Variable    LOW_AVAILABILITY_TIMEFRAME
+    ...    type=string
+    ...    description=The timeframe to check for low availability in hours.
+    ...    pattern=^\d+$
+    ...    example=24
+    ...    default=24
+    ${LOW_AVAILABILITY_INTERVAL}=    RW.Core.Import User Variable    LOW_AVAILABILITY_INTERVAL
+    ...    type=string
+    ...    description=The interval to check for low availability in this formats PT1H, PT1M, PT1S etc.
+    ...    pattern=^\w+$
+    ...    example=PT1H
+    ...    default=PT1H
     Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}    ${AZURE_SUBSCRIPTION_ID}
     Set Suite Variable    ${AZURE_RESOURCE_GROUP}    ${AZURE_RESOURCE_GROUP}
     Set Suite Variable    ${HIGH_CPU_PERCENTAGE}    ${HIGH_CPU_PERCENTAGE}
@@ -439,3 +520,6 @@ Suite Initialization
     Set Suite Variable    ${HIGH_MEMORY_TIMEFRAME}    ${HIGH_MEMORY_TIMEFRAME}
     Set Suite Variable    ${HIGH_CACHE_MISS_RATE}    ${HIGH_CACHE_MISS_RATE}
     Set Suite Variable    ${HIGH_CACHE_MISS_TIMEFRAME}    ${HIGH_CACHE_MISS_TIMEFRAME}
+    Set Suite Variable    ${LOW_AVAILABILITY_THRESHOLD}    ${LOW_AVAILABILITY_THRESHOLD}
+    Set Suite Variable    ${LOW_AVAILABILITY_TIMEFRAME}    ${LOW_AVAILABILITY_TIMEFRAME}
+    Set Suite Variable    ${LOW_AVAILABILITY_INTERVAL}    ${LOW_AVAILABILITY_INTERVAL}
