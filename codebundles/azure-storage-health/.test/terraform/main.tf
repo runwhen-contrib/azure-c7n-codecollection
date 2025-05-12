@@ -24,8 +24,14 @@ resource "azurerm_snapshot" "unused_snapshot" {
   tags                = var.tags
 }
 
+resource "random_string" "storage_suffix" {
+  length  = 8
+  upper   = false
+  special = false
+}
+
 resource "azurerm_storage_account" "example" {
-  name                     = "c7ntest399332"
+  name                     = "c7ntest${random_string.storage_suffix.result}"
   resource_group_name      = azurerm_resource_group.test_rg.name
   location                 = azurerm_resource_group.test_rg.location
   account_tier             = "Standard"
