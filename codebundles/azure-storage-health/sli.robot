@@ -14,7 +14,28 @@ Library    CloudCustodian.Core
 
 Suite Setup         Suite Initialization
 *** Tasks ***
-Check for Unused Disks in resource group `${AZURE_RESOURCE_GROUP}`
+Count Azure Storage Accounts with Health Status of `Available` in resource group `${AZURE_RESOURCE_GROUP}`
+    [Documentation]    Count Azure storage accounts with health status of `Available`
+    [Tags]    Storage    Azure    Health    access:read-only
+    ${output}=    RW.CLI.Run Bash File
+    ...    bash_file=azure_storage_health_check.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ...    show_in_rwl_cheatsheet=true
+    ${report_data}=    RW.CLI.Run Cli
+    ...    cmd=cat storage_health.json
+    TRY
+        ${health_list}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
+    EXCEPT
+        Log    Failed to load JSON payload, defaulting to empty list.    WARN
+        ${health_list}=    Create List
+    END
+    ${count}=    Evaluate    len([health for health in ${health_list} if health['properties']['availabilityState'] == 'Available'])
+    ${available_storage_score}=    Evaluate    1 if int(${count}) >= 1 else 0
+    Set Global Variable    ${available_storage_score}
+
+Count Unused Disks in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Count disks that are not attached to any VM
     [Tags]    Disk    Azure    Storage    Cost    access:read-only
     CloudCustodian.Core.Generate Policy   
@@ -27,7 +48,7 @@ Check for Unused Disks in resource group `${AZURE_RESOURCE_GROUP}`
     ${unused_disk_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_UNUSED_DISK}) else 0
     Set Global Variable    ${unused_disk_score}
 
-Check for Unused Snapshots in resource group `${AZURE_RESOURCE_GROUP}`
+Count Unused Snapshots in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Count snapshots that are not attached to any disk
     [Tags]    Snapshot    Azure    Storage    Cost    access:read-only
     CloudCustodian.Core.Generate Policy   
@@ -40,7 +61,7 @@ Check for Unused Snapshots in resource group `${AZURE_RESOURCE_GROUP}`
     ${unused_snapshot_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_UNUSED_SNAPSHOT}) else 0
     Set Global Variable    ${unused_snapshot_score}
 
-Check for Unused Storage Accounts in resource group `${AZURE_RESOURCE_GROUP}`
+Count Unused Storage Accounts in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Count storage accounts with no transactions
     [Tags]    Storage    Azure    Cost    access:read-only
     CloudCustodian.Core.Generate Policy   
@@ -55,7 +76,7 @@ Check for Unused Storage Accounts in resource group `${AZURE_RESOURCE_GROUP}`
     Set Global Variable    ${unused_storage_account_score}
 
 
-Check for Public Accessible Storage Accounts in resource group `${AZURE_RESOURCE_GROUP}`
+Count Public Accessible Storage Accounts in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Count storage accounts with public access enabled
     [Tags]    Storage    Azure    Security    access:read-only
     CloudCustodian.Core.Generate Policy   
@@ -70,7 +91,7 @@ Check for Public Accessible Storage Accounts in resource group `${AZURE_RESOURCE
 
 
 Generate Health Score
-    ${health_score}=    Evaluate  (${unused_snapshot_score} + ${unused_disk_score} + ${unused_storage_account_score} + ${public_access_sa_score}) / 4
+    ${health_score}=    Evaluate  (${unused_snapshot_score} + ${unused_disk_score} + ${unused_storage_account_score} + ${public_access_sa_score} + ${available_storage_score}) / 5
     ${health_score}=    Convert to Number    ${health_score}  2
     RW.Core.Push Metric    ${health_score}
 
@@ -127,3 +148,6 @@ Suite Initialization
     Set Suite Variable    ${MAX_UNUSED_STORAGE_ACCOUNT}    ${MAX_UNUSED_STORAGE_ACCOUNT}
     Set Suite Variable    ${MAX_PUBLIC_ACCESS_STORAGE_ACCOUNT}    ${MAX_PUBLIC_ACCESS_STORAGE_ACCOUNT}
     Set Suite Variable    ${AZURE_RESOURCE_GROUP}    ${AZURE_RESOURCE_GROUP}
+    Set Suite Variable
+    ...    ${env}
+    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}"}

@@ -16,6 +16,51 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
+List Azure Storage Health in resource group `${AZURE_RESOURCE_GROUP}`
+    [Documentation]    List Azure storage health by identifying unused disks, snapshots, and storage accounts
+    [Tags]    Storage    Azure    Health    access:read-only
+    ${output}=    RW.CLI.Run Bash File
+    ...    bash_file=azure_storage_health_check.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ...    show_in_rwl_cheatsheet=true
+    ${report_data}=    RW.CLI.Run Cli
+    ...    cmd=cat storage_health.json
+    TRY
+        ${health_list}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
+    EXCEPT
+        Log    Failed to load JSON payload, defaulting to empty list.    WARN
+        ${health_list}=    Create List
+    END
+    IF    len(@{health_list}) > 0
+
+        FOR    ${health}    IN    @{health_list}
+            ${pretty_health}=    Evaluate    pprint.pformat(${health})    modules=pprint
+            ${storage_name}=    Set Variable    ${health['resourceName']}
+            ${health_status}=    Set Variable    ${health['properties']['availabilityState']}
+            IF    "${health_status}" != "Available"
+                RW.Core.Add Issue
+                ...    severity=3
+                ...    expected=Azure storage account `${storage_name}` should have health status of `Available` in resource group `${AZURE_RESOURCE_GROUP}` 
+                ...    actual=Azure storage account `${storage_name}` has health status of `${health_status}` in resource group `${AZURE_RESOURCE_GROUP}` 
+                ...    title=Azure Storage Account `${storage_name}` with Health Status of `${health_status}` found in Resource Group `${AZURE_RESOURCE_GROUP}` 
+                ...    reproduce_hint=${output.cmd}
+                ...    details=${pretty_health}
+                ...    next_steps=Investigate the health status of the Azure Storage Account in resource group `${AZURE_RESOURCE_GROUP}` 
+            END
+        END
+    ELSE
+        RW.Core.Add Issue
+        ...    severity=4
+        ...    expected=Azure Storage account health should be enabled in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_RESOURCE_GROUP}`
+        ...    actual=Azure Storage account health appears unavailable in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_RESOURCE_GROUP}`
+        ...    title=Azure resource health is unavailable for Azure Storage account in resource group `${AZURE_RESOURCE_GROUP}`
+        ...    reproduce_hint=$${output.cmd}
+        ...    details=${health_list}
+        ...    next_steps=Please escalate to the Azure service owner to enable provider Microsoft.ResourceHealth.
+    END
+
 List Unused Azure Disks in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    List Azure disks that are not attached to any VM
     [Tags]    Disk    Azure    Storage    Cost    access:read-only
@@ -204,3 +249,6 @@ Suite Initialization
     Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}    ${AZURE_SUBSCRIPTION_ID}
     Set Suite Variable    ${AZURE_RESOURCE_GROUP}    ${AZURE_RESOURCE_GROUP}
     Set Suite Variable    ${UNUSED_STORAGE_ACCOUNT_TIMEFRAME}    ${UNUSED_STORAGE_ACCOUNT_TIMEFRAME}
+    Set Suite Variable
+    ...    ${env}
+    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}"}
