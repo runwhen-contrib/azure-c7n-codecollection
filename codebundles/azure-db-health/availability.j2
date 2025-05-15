@@ -1,0 +1,15 @@
+policies:
+  - name: {{name}}-availability
+    resource: {{resource}}
+    filters:
+      - type: metric
+        metric: {{metric}}
+        op: lt  
+        aggregation: average
+        threshold: {{threshold}}
+        timeframe: {{timeframe}}
+        interval: {{interval}}
+      - type: value
+        key: resourceGroup
+        op: eq
+        value: {{resourceGroup}}

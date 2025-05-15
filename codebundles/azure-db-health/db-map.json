@@ -6,7 +6,8 @@
         "ha": {"key": "properties.highAvailability.mode", "value": "Disabled"},
         "replication": {"key": "properties.replicationRole", "value": "None"},
         "memory_metric": "memory_percent",
-        "cpu_metric": "cpu_percent"
+        "cpu_metric": "cpu_percent",
+        "provider_path": "Microsoft.DBforMySQL/flexibleServers"
     },
     "sql-database": {
         "resource": "azure.sql-database",
@@ -14,14 +15,17 @@
         "ha": {"key": "properties.zoneRedundant", "value": "false"},
         "replication": {"key": "readReplicaCount", "value": "0"},
         "memory_metric": "memory_percent",
-        "cpu_metric": "cpu_percent"
+        "cpu_metric": "cpu_percent",
+        "availability": "availability",
+        "provider_path": "Microsoft.Sql/servers/<server>/databases"
     },
     "sql-server": {
         "resource": "azure.sqlserver",
         "display_name": "SQL Server",
         "publicnetworkaccess": "properties.publicNetworkAccess",
         "memory_metric": "memory_percent",
-        "cpu_metric": "cpu_percent"
+        "cpu_metric": "cpu_percent",
+        "provider_path": "Microsoft.Sql/servers"
     },
     "postgresql-server": {
         "resource": "azure.postgresql-server",
@@ -29,18 +33,22 @@
         "publicnetworkaccess": "properties.publicNetworkAccess",
         "replication": {"key": "replicationRole", "value": ""},
         "memory_metric": "memory_percent",
-        "cpu_metric": "cpu_percent"
+        "cpu_metric": "cpu_percent",
+        "provider_path": "Microsoft.DBforPostgreSQL/servers"
     },
     "cosmosdb": {
         "resource": "azure.cosmosdb",
         "display_name": "CosmosDB",
         "publicnetworkaccess": "properties.publicNetworkAccess",
-        "ha": {"key": "properties.enableAutomaticFailover", "value": "false"}
+        "ha": {"key": "properties.enableAutomaticFailover", "value": "false"},
+        "availability": "ServiceAvailability",
+        "provider_path": "Microsoft.DocumentDB/databaseAccounts"
     },
     "redis": {
         "resource": "azure.redis",
         "display_name": "Redis Cache",
         "memory_metric": "usedmemorypercentage",
-        "cpu_metric": "percentProcessorTime"
+        "cpu_metric": "percentProcessorTime",
+        "provider_path": "Microsoft.Cache/Redis"
     }
 }

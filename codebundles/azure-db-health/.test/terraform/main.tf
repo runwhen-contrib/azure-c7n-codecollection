@@ -1,3 +1,8 @@
+resource "random_pet" "name_prefix" {
+  prefix = var.resource_group
+  length = 1
+}
+
 resource "azurerm_resource_group" "rg" {
   name     = var.resource_group
   location = var.location
@@ -5,103 +10,111 @@ resource "azurerm_resource_group" "rg" {
 }
 
 resource "azurerm_mysql_flexible_server" "mysqlfx_server" {
-  name                   = "yoko-ono-mysqlfx"
+  name                   = "${random_pet.name_prefix.id}-mysqlfx"
   resource_group_name    = azurerm_resource_group.rg.name
   location               = azurerm_resource_group.rg.location
   sku_name               = "B_Standard_B1ms"
   version                = "8.0.21"
   administrator_login    = "mysqladmin"
   administrator_password = "YourStrongPassword123!"
-  backup_retention_days  = 1
+  zone                   = null
+
+  backup_retention_days = 1
+
   storage {
     size_gb           = 20
     auto_grow_enabled = false
   }
+
   tags = var.tags
 }
 
-resource "azurerm_postgresql_server" "psql-server" {
-  name                = "yoko-ono-psqlserver"
-  location            = azurerm_resource_group.rg.location
-  resource_group_name = azurerm_resource_group.rg.name
+resource "azurerm_postgresql_flexible_server" "psql" {
+  name                   = "${random_pet.name_prefix.id}-pgsql"
+  resource_group_name    = azurerm_resource_group.rg.name
+  location               = azurerm_resource_group.rg.location
+  administrator_login    = "psqladmin"
+  administrator_password = "H@Sh1CoR3!"
+  version                = "11"
+  sku_name               = "B_Standard_B1ms"
+  storage_mb             = 32768
+  zone                   = null
 
-  administrator_login          = "psqladmin"
-  administrator_login_password = "H@Sh1CoR3!"
+  backup_retention_days         = 7
+  geo_redundant_backup_enabled  = false
+  public_network_access_enabled = true
 
-  sku_name   = "B_Gen5_1" # SKU (Basic, 1 vCore)
-  version    = "11"
-  storage_mb = 5120 # Minimum allowed storage (5GB)
-
-  backup_retention_days        = 7     # Minimum required
-  geo_redundant_backup_enabled = false # No expensive geo-redundancy
-  auto_grow_enabled            = false # Prevent extra costs from auto-scaling
-
-  public_network_access_enabled    = true
-  ssl_enforcement_enabled          = true
-  ssl_minimal_tls_version_enforced = "TLS1_2"
-  tags                             = var.tags
+  tags = var.tags
 }
 
-resource "azurerm_cosmosdb_account" "cosmosdb-account" {
-  name                = "yoko-ono-cosmosdb"
+resource "azurerm_postgresql_flexible_server_configuration" "require_ssl" {
+  server_id = azurerm_postgresql_flexible_server.psql.id
+  name      = "require_secure_transport"
+  value     = "ON"
+}
+
+resource "azurerm_postgresql_flexible_server_firewall_rule" "all_ips" {
+  server_id        = azurerm_postgresql_flexible_server.psql.id
+  name             = "allow-all"
+  start_ip_address = "0.0.0.0"
+  end_ip_address   = "255.255.255.255"
+}
+
+resource "azurerm_cosmosdb_account" "cosmosdb_account" {
+  name                = "${random_pet.name_prefix.id}-cosmosdb"
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
   offer_type          = "Standard"
   kind                = "GlobalDocumentDB"
+  free_tier_enabled   = true
 
-  free_tier_enabled = true # First 400 RU/s free
   consistency_policy {
-    consistency_level = "Session" # Lower cost compared to Strong
+    consistency_level = "Session"
   }
 
   geo_location {
     location          = azurerm_resource_group.rg.location
     failover_priority = 0
   }
+
   tags = var.tags
 }
 
 resource "azurerm_cosmosdb_sql_database" "cosmos_sql_database" {
-  name                = "cosmosd-db"
+  name                = "cosmosdb-sql"
   resource_group_name = azurerm_resource_group.rg.name
-  account_name        = azurerm_cosmosdb_account.cosmosdb-account.name
+  account_name        = azurerm_cosmosdb_account.cosmosdb_account.name
 }
 
 resource "azurerm_cosmosdb_sql_container" "cosmos_sql_container" {
   name                = "cosmos-sql-container"
   resource_group_name = azurerm_resource_group.rg.name
-  account_name        = azurerm_cosmosdb_account.cosmosdb-account.name
+  account_name        = azurerm_cosmosdb_account.cosmosdb_account.name
   database_name       = azurerm_cosmosdb_sql_database.cosmos_sql_database.name
 
   partition_key_paths = ["/id"]
-  throughput          = null # Uses serverless mode (pay-per-request)
+  throughput          = null
 }
 
 resource "azurerm_redis_cache" "redis" {
-  name                 = "yoko-ono-redis"
+  name                 = "${random_pet.name_prefix.id}-redis"
   location             = azurerm_resource_group.rg.location
   resource_group_name  = azurerm_resource_group.rg.name
-  capacity             = 0   # C0 (250 MB)
-  family               = "C" # Basic Cache family
+  capacity             = 0
+  family               = "C"
   sku_name             = "Basic"
   non_ssl_port_enabled = false
   tags                 = var.tags
 }
 
 resource "azurerm_mssql_server" "sql_server" {
-  name                         = "yoko-ono-sql"
+  name                         = "${random_pet.name_prefix.id}-sql"
   resource_group_name          = azurerm_resource_group.rg.name
   location                     = azurerm_resource_group.rg.location
   version                      = "12.0"
   administrator_login          = "sqladmin"
   administrator_login_password = "YourStrongPassword123!"
-
-  # azuread_administrator {
-  #   login_username = "sqladmin"
-  #   object_id      = "your-azure-ad-object-id"
-  # }
-
-  tags = var.tags
+  tags                         = var.tags
 }
 
 resource "azurerm_mssql_database" "sql_db" {
