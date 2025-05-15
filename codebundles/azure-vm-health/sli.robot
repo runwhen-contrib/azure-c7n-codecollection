@@ -14,7 +14,33 @@ Library    CloudCustodian.Core
 
 Suite Setup         Suite Initialization
 *** Tasks ***
-Check for VMs With Public IP in resource group `${AZURE_RESOURCE_GROUP}` in Azure Subscription `${AZURE_SUBSCRIPTION_NAME}`
+Check Azure VM Health in resource group `${AZURE_RESOURCE_GROUP}`
+    [Documentation]    Checks the health status of Azure VMs using the Microsoft.ResourceHealth provider
+    [Tags]    VM    Azure    Health    ResourceHealth    access:read-only
+
+    ${output}=    RW.CLI.Run Bash File
+    ...    bash_file=vm_health_check.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ...    show_in_rwl_cheatsheet=true
+    ${report_data}=    RW.CLI.Run Cli
+    ...    cmd=cat vm_health.json
+    TRY
+        ${health_list}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
+    EXCEPT
+        Log    Failed to load JSON payload, defaulting to empty list.    WARN
+        ${health_list}=    Create List
+    END
+    IF    len(@{health_list}) > 0
+        ${healthy_count}=    Evaluate    sum(1 for health in ${health_list} if health['properties']['availabilityState'] == 'Available')    json
+        ${healthy_score}=    Evaluate    1 if int(${healthy_count}) == len(${health_list}) else 0
+    ELSE
+        ${healthy_score}=    Set Variable    0
+    END
+    Set Global Variable    ${healthy_score}
+
+Check for VMs With Public IP in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Lists VMs with public IP address
     [Tags]    VM    Azure    Network    Security    access:read-only 
     CloudCustodian.Core.Generate Policy   
@@ -27,7 +53,7 @@ Check for VMs With Public IP in resource group `${AZURE_RESOURCE_GROUP}` in Azur
     ${vm_with_public_ip_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_VM_WITH_PUBLIC_IP}) else 0
     Set Global Variable    ${vm_with_public_ip_score}
 
-Check for VMs With High CPU Usage in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+Check for VMs With High CPU Usage in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Checks for VMs with high CPU usage
     [Tags]    VM    Azure    CPU    Performance    access:read-only
     CloudCustodian.Core.Generate Policy   
@@ -42,7 +68,7 @@ Check for VMs With High CPU Usage in resource group `${AZURE_RESOURCE_GROUP}` in
     ${cpu_usage_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_VM_WITH_HIGH_CPU}) else 0
     Set Global Variable    ${cpu_usage_score}
 
-Check for Stopped VMs in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+Check for Stopped VMs in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Count VMs that are in a stopped state
     [Tags]    VM    Azure    State    Cost    access:read-only
     CloudCustodian.Core.Generate Policy   
@@ -56,7 +82,7 @@ Check for Stopped VMs in resource group `${AZURE_RESOURCE_GROUP}` in Subscriptio
     ${stopped_vm_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_STOPPED_VM}) else 0
     Set Global Variable    ${stopped_vm_score}
 
-Check for Underutilized VMs Based on CPU Usage in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+Check for Underutilized VMs Based on CPU Usage in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Count VMs that are underutilized based on CPU usage
     [Tags]    VM    Azure    CPU    Utilization    access:read-only
     CloudCustodian.Core.Generate Policy   
@@ -71,7 +97,7 @@ Check for Underutilized VMs Based on CPU Usage in resource group `${AZURE_RESOUR
     ${underutilized_vm_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_UNDERUTILIZED_VM}) else 0
     Set Global Variable    ${underutilized_vm_score}
 
-Check for VMs With High Memory Usage in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+Check for VMs With High Memory Usage in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Count VMs that have high memory usage based on available memory percentage
     [Tags]    VM    Azure    Memory    Performance    access:read-only
     CloudCustodian.Core.Generate Policy   
@@ -86,7 +112,7 @@ Check for VMs With High Memory Usage in resource group `${AZURE_RESOURCE_GROUP}`
     ${high_memory_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_VM_WITH_HIGH_MEMORY}) else 0
     Set Global Variable    ${high_memory_score}
 
-Check for Underutilized VMs Based on Memory Usage in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+Check for Underutilized VMs Based on Memory Usage in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Count VMs that are underutilized based on memory usage
     [Tags]    VM    Azure    Memory    Utilization    access:read-only
     CloudCustodian.Core.Generate Policy   
@@ -101,7 +127,7 @@ Check for Underutilized VMs Based on Memory Usage in resource group `${AZURE_RES
     ${underutilized_memory_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_UNDERUTILIZED_VM_MEMORY}) else 0
     Set Global Variable    ${underutilized_memory_score}
 
-Check for Unused Network Interfaces in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+Check for Unused Network Interfaces in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Count network interfaces that are not attached to any virtual machine
     [Tags]    Network    Azure    NIC    Cost    access:read-only
     CloudCustodian.Core.Generate Policy   
@@ -115,7 +141,7 @@ Check for Unused Network Interfaces in resource group `${AZURE_RESOURCE_GROUP}` 
     Set Global Variable    ${unused_nic_score}
 
 
-Check for Unused Public IPs in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+Check for Unused Public IPs in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Count public IP addresses that are not attached to any resource
     [Tags]    Network    Azure    PublicIP    Cost    access:read-only
     CloudCustodian.Core.Generate Policy   
@@ -129,7 +155,7 @@ Check for Unused Public IPs in resource group `${AZURE_RESOURCE_GROUP}` in Subsc
     Set Global Variable    ${unused_public_ip_score}
 
 Generate Health Score
-    ${health_score}=    Evaluate  (${vm_with_public_ip_score} + ${cpu_usage_score} + ${stopped_vm_score} + ${underutilized_vm_score} + ${high_memory_score} + ${underutilized_memory_score} + ${unused_nic_score} + ${unused_public_ip_score}) / 8
+    ${health_score}=    Evaluate  (${vm_with_public_ip_score} + ${cpu_usage_score} + ${stopped_vm_score} + ${underutilized_vm_score} + ${high_memory_score} + ${underutilized_memory_score} + ${unused_nic_score} + ${unused_public_ip_score} + ${healthy_score}) / 9
     ${health_score}=    Convert to Number    ${health_score}  2
     RW.Core.Push Metric    ${health_score}
 
@@ -144,11 +170,6 @@ Suite Initialization
     ${AZURE_SUBSCRIPTION_ID}=    RW.Core.Import User Variable    AZURE_SUBSCRIPTION_ID
     ...    type=string
     ...    description=The Azure Subscription ID for the resource.  
-    ...    pattern=\w*
-    ...    default=""
-    ${AZURE_SUBSCRIPTION_NAME}=    RW.Core.Import User Variable    AZURE_SUBSCRIPTION_NAME
-    ...    type=string
-    ...    description=The Azure Subscription Name.  
     ...    pattern=\w*
     ...    default=""
     ${AZURE_RESOURCE_GROUP}=    RW.Core.Import User Variable    AZURE_RESOURCE_GROUP
@@ -257,7 +278,6 @@ Suite Initialization
     ...    pattern=^\d+$
     ...    example=1
     ...    default=0
-    Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${AZURE_SUBSCRIPTION_NAME}
     Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}    ${AZURE_SUBSCRIPTION_ID}
     Set Suite Variable    ${AZURE_RESOURCE_GROUP}    ${AZURE_RESOURCE_GROUP}
     Set Suite Variable    ${HIGH_CPU_PERCENTAGE}    ${HIGH_CPU_PERCENTAGE}
@@ -276,3 +296,6 @@ Suite Initialization
     Set Suite Variable    ${MAX_UNDERUTILIZED_VM_MEMORY}    ${MAX_UNDERUTILIZED_VM_MEMORY}
     Set Suite Variable    ${MAX_UNUSED_NIC}    ${MAX_UNUSED_NIC}
     set Suite Variable    ${MAX_UNUSED_PUBLIC_IP}    ${MAX_UNUSED_PUBLIC_IP}
+    Set Suite Variable
+    ...    ${env}
+    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}"}

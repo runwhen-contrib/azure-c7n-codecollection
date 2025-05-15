@@ -16,10 +16,56 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-List VMs With Public IP in resource group `${AZURE_RESOURCE_GROUP}` in Azure Subscription `${AZURE_SUBSCRIPTION_NAME}`
+Check Azure VM Health in resource group `${AZURE_RESOURCE_GROUP}`
+    [Documentation]    Checks the health status of Azure VMs using the Microsoft.ResourceHealth provider
+    [Tags]    VM    Azure    Health    ResourceHealth    access:read-only
+
+    ${output}=    RW.CLI.Run Bash File
+    ...    bash_file=vm_health_check.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ...    show_in_rwl_cheatsheet=true
+    ${report_data}=    RW.CLI.Run Cli
+    ...    cmd=cat vm_health.json
+    TRY
+        ${health_list}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
+    EXCEPT
+        Log    Failed to load JSON payload, defaulting to empty list.    WARN
+        ${health_list}=    Create List
+    END
+    IF    len(@{health_list}) > 0
+
+        FOR    ${health}    IN    @{health_list}
+            ${pretty_health}=    Evaluate    pprint.pformat(${health})    modules=pprint
+            ${vm_name}=    Set Variable    ${health['resourceName']}
+            ${health_status}=    Set Variable    ${health['properties']['availabilityState']}
+            IF    "${health_status}" != "Available"
+                RW.Core.Add Issue
+                ...    severity=3
+                ...    expected=Azure VM `${vm_name}` should have health status of `Available` in resource group `${AZURE_RESOURCE_GROUP}`
+                ...    actual=Azure VM `${vm_name}` has health status of `${health_status}` in resource group `${AZURE_RESOURCE_GROUP}`
+                ...    title=Azure VM `${vm_name}` with Health Status of `${health_status}` found in Resource Group `${AZURE_RESOURCE_GROUP}`
+                ...    reproduce_hint=${output.cmd}
+                ...    details=${pretty_health}
+                ...    next_steps=Investigate the health status of the Azure VM in resource group `${AZURE_RESOURCE_GROUP}`
+            END
+        END
+    ELSE
+        RW.Core.Add Issue
+        ...    severity=4
+        ...    expected=Azure VM health should be enabled in resource group `${AZURE_RESOURCE_GROUP}`
+        ...    actual=Azure VM health appears unavailable in resource group `${AZURE_RESOURCE_GROUP}`
+        ...    title=Azure resource health is unavailable for Azure VMs in resource group `${AZURE_RESOURCE_GROUP}`
+        ...    reproduce_hint=${output.cmd}
+        ...    details=${health_list}
+        ...    next_steps=Please escalate to the Azure service owner to enable provider Microsoft.ResourceHealth.
+    END
+
+List VMs With Public IP in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Lists VMs with public IP address
     [Tags]    VM    Azure    Network    Security    access:read-only
-    CloudCustodian.Core.Generate Policy   
+    CloudCustodian.Core.Generate Policy
     ...    ${CURDIR}/vm-with-public-ip.j2
     ...    resourceGroup=${AZURE_RESOURCE_GROUP}
     ${c7n_output}=    RW.CLI.Run Cli
@@ -45,21 +91,21 @@ List VMs With Public IP in resource group `${AZURE_RESOURCE_GROUP}` in Azure Sub
             ${vm_name}=    Set Variable    ${vm['name']}
             RW.Core.Add Issue
             ...    severity=4
-            ...    expected=Azure VM `${vm_name}` should not be publicly accessible in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
-            ...    actual=Azure VM `${vm_name}` is publicly accessible in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
-            ...    title=Azure VM `${vm_name}` with Public IP Detected in Resource Group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    expected=Azure VM `${vm_name}` should not be publicly accessible in resource group `${resource_group}`
+            ...    actual=Azure VM `${vm_name}` is publicly accessible in resource group `${resource_group}`
+            ...    title=Azure VM `${vm_name}` with Public IP Detected in Resource Group `${resource_group}`
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details=${pretty_vm}
-            ...    next_steps=Disable the public IP address from azure VM in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    next_steps=Disable the public IP address from azure VM in resource group `${AZURE_RESOURCE_GROUP}`
         END
     ELSE
-        RW.Core.Add Pre To Report    "No VMs with public IPs found in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
+        RW.Core.Add Pre To Report    "No VMs with public IPs found in resource group `${AZURE_RESOURCE_GROUP}`"
     END
 
-List for Stopped VMs in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+List for Stopped VMs in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Lists VMs that are in a stopped state
     [Tags]    VM    Azure    State    Cost    access:read-only
-    CloudCustodian.Core.Generate Policy   
+    CloudCustodian.Core.Generate Policy
     ...    ${CURDIR}/stopped-vm.j2
     ...    timeframe=${STOPPED_VM_TIMEFRAME}
     ...    resourceGroup=${AZURE_RESOURCE_GROUP}
@@ -86,21 +132,21 @@ List for Stopped VMs in resource group `${AZURE_RESOURCE_GROUP}` in Subscription
             ${vm_name}=    Set Variable    ${vm['name']}
             RW.Core.Add Issue
             ...    severity=4
-            ...    expected=Azure VM `${vm_name}` should be in use in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
-            ...    actual=Azure VM `${vm_name}` is in stopped state more than `${STOPPED_VM_TIMEFRAME}` hours in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
-            ...    title=Stopped Azure VM `${vm_name}` found in Resource Group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    expected=Azure VM `${vm_name}` should be in use in resource group `${resource_group}`
+            ...    actual=Azure VM `${vm_name}` is in stopped state more than `${STOPPED_VM_TIMEFRAME}` hours in resource group `${resource_group}`
+            ...    title=Stopped Azure VM `${vm_name}` found in Resource Group `${resource_group}`
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details=${pretty_vm}
-            ...    next_steps=Delete the stopped azure vm if no longer needed to reduce costs in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    next_steps=Delete the stopped azure vm if no longer needed to reduce costs in resource group `${AZURE_RESOURCE_GROUP}`
         END
     ELSE
-        RW.Core.Add Pre To Report    "No stopped VMs found in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
+        RW.Core.Add Pre To Report    "No stopped VMs found in resource group `${AZURE_RESOURCE_GROUP}`"
     END
 
-List VMs With High CPU Usage in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+List VMs With High CPU Usage in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Checks for VMs with high CPU usage
     [Tags]    VM    Azure    CPU    Performance    access:read-only
-    CloudCustodian.Core.Generate Policy   
+    CloudCustodian.Core.Generate Policy
     ...    ${CURDIR}/vm-cpu-usage.j2
     ...    cpu_percentage=${HIGH_CPU_PERCENTAGE}
     ...    timeframe=${HIGH_CPU_TIMEFRAME}
@@ -133,22 +179,22 @@ List VMs With High CPU Usage in resource group `${AZURE_RESOURCE_GROUP}` in Subs
             ${cpu_percentage}=    Convert To Number    ${cpu_percentage_result.stdout}    2
             RW.Core.Add Issue
             ...    severity=3
-            ...    expected=Azure VM `${vm_name}` should have CPU usage below `${cpu_percentage}%` in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
-            ...    actual=Azure VM `${vm_name}` has high CPU usage of `${cpu_percentage}%` in the last `${HIGH_CPU_TIMEFRAME}` hours in resource group ` ${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
-            ...    title=Azure VM `${vm_name}` with high CPU Usage found in Resource Group ` ${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    expected=Azure VM `${vm_name}` should have CPU usage below `${cpu_percentage}%` in resource group `${resource_group}`
+            ...    actual=Azure VM `${vm_name}` has high CPU usage of `${cpu_percentage}%` in the last `${HIGH_CPU_TIMEFRAME}` hours in resource group ` ${resource_group}`
+            ...    title=Azure VM `${vm_name}` with high CPU Usage found in Resource Group ` ${resource_group}`
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details=${pretty_vm}
-            ...    next_steps=Increase the CPU cores by resizing to a larger azure VM SKU in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    next_steps=Increase the CPU cores by resizing to a larger azure VM SKU in resource group `${AZURE_RESOURCE_GROUP}`
         END
     ELSE
-        RW.Core.Add Pre To Report    "No VMs with high CPU usage found in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
+        RW.Core.Add Pre To Report    "No VMs with high CPU usage found in resource group `${AZURE_RESOURCE_GROUP}`"
     END
 
 
-List Underutilized VMs Based on CPU Usage in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+List Underutilized VMs Based on CPU Usage in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    List Azure Virtual Machines (VMs) that have low CPU utilization based on a defined threshold and timeframe.
     [Tags]    VM    Azure    CPU    Performance    access:read-only
-    CloudCustodian.Core.Generate Policy   
+    CloudCustodian.Core.Generate Policy
     ...    ${CURDIR}/under-utilized-vm-cpu-usage.j2
     ...    cpu_percentage=${LOW_CPU_PERCENTAGE}
     ...    timeframe=${LOW_CPU_TIMEFRAME}
@@ -181,26 +227,26 @@ List Underutilized VMs Based on CPU Usage in resource group `${AZURE_RESOURCE_GR
             ${cpu_percentage}=    Convert To Number    ${cpu_percentage_result.stdout}    2
             RW.Core.Add Issue
             ...    severity=4
-            ...    expected=Azure VM `${vm_name}` should have adequate CPU utilization in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
-            ...    actual=Azure VM `${vm_name}` has low CPU usage of `${cpu_percentage}%` in the last `${HIGH_CPU_TIMEFRAME}` hours in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
-            ...    title=Underutilized Azure VM `${vm_name}` found in Resource Group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    expected=Azure VM `${vm_name}` should have adequate CPU utilization in resource group `${resource_group}`
+            ...    actual=Azure VM `${vm_name}` has low CPU usage of `${cpu_percentage}%` in the last `${HIGH_CPU_TIMEFRAME}` hours in resource group `${resource_group}`
+            ...    title=Underutilized Azure VM `${vm_name}` found in Resource Group `${resource_group}`
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details=${pretty_vm}
-            ...    next_steps=Resize to a smaller azure VM SKU to optimize costs in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    next_steps=Resize to a smaller azure VM SKU to optimize costs in resource group `${AZURE_RESOURCE_GROUP}`
         END
     ELSE
-        RW.Core.Add Pre To Report    "No underutilized VMs found in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
+        RW.Core.Add Pre To Report    "No underutilized VMs found in resource group `${AZURE_RESOURCE_GROUP}`"
     END
 
-List VMs With High Memory Usage in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+List VMs With High Memory Usage in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    List Azure Virtual Machines (VMs) that have high memory usage based on a defined threshold and timeframe.
     [Tags]    VM    Azure    Memory    Performance    access:read-only
-    CloudCustodian.Core.Generate Policy   
+    CloudCustodian.Core.Generate Policy
     ...    ${CURDIR}/vm-memory-usage.j2
     ...    op=lt
     ...    memory_percentage=${HIGH_MEMORY_PERCENTAGE}
     ...    timeframe=${HIGH_MEMORY_TIMEFRAME}
-    ...    resourceGroup=${AZURE_RESOURCE_GROUP}    
+    ...    resourceGroup=${AZURE_RESOURCE_GROUP}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/vm-memory-usage.yaml --cache-period 0
     ${report_data}=    RW.CLI.Run Cli
@@ -230,21 +276,21 @@ List VMs With High Memory Usage in resource group `${AZURE_RESOURCE_GROUP}` in S
             ${memory_percentage}=    Evaluate    round(100 - ${available_memory}, 2)
             RW.Core.Add Issue
             ...    severity=3
-            ...    expected=Azure VM `${vm_name}` should have adequate available memory in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
-            ...    actual=Azure VM `${vm_name}` has high memory usage of `${memory_percentage}%` in the last `${HIGH_MEMORY_TIMEFRAME}` hours in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
-            ...    title=High Memory Usage on Azure VM `${vm_name}` found in Resource Group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    expected=Azure VM `${vm_name}` should have adequate available memory in resource group `${resource_group}`
+            ...    actual=Azure VM `${vm_name}` has high memory usage of `${memory_percentage}%` in the last `${HIGH_MEMORY_TIMEFRAME}` hours in resource group `${resource_group}`
+            ...    title=High Memory Usage on Azure VM `${vm_name}` found in Resource Group `${resource_group}`
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details=${pretty_vm}
-            ...    next_steps=Resize to a larger azure VM SKU to better match memory usage requirements in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    next_steps=Resize to a larger azure VM SKU to better match memory usage requirements in resource group `${AZURE_RESOURCE_GROUP}`
         END
     ELSE
-        RW.Core.Add Pre To Report    "No VMs with high memory usage found in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
+        RW.Core.Add Pre To Report    "No VMs with high memory usage found in resource group `${AZURE_RESOURCE_GROUP}`"
     END
 
-List Underutilized VMs Based on Memory Usage in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+List Underutilized VMs Based on Memory Usage in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    List Azure Virtual Machines (VMs) that are underutilized based on memory usage
     [Tags]    VM    Azure    Memory    Utilization    access:read-only
-    CloudCustodian.Core.Generate Policy   
+    CloudCustodian.Core.Generate Policy
     ...    ${CURDIR}/vm-memory-usage.j2
     ...    op=gt
     ...    memory_percentage=${LOW_MEMORY_PERCENTAGE}
@@ -279,21 +325,21 @@ List Underutilized VMs Based on Memory Usage in resource group `${AZURE_RESOURCE
             ${memory_percentage}=    Evaluate    round(100 - ${available_memory}, 2)
             RW.Core.Add Issue
             ...    severity=4
-            ...    expected=Azure VM `${vm_name}` should have optimal memory utilization in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
-            ...    actual=Azure VM `${vm_name}` has high available memory of `${memory_percentage}%` in the last `${LOW_MEMORY_TIMEFRAME}` hours in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
-            ...    title=Underutilized Memory on Azure VM `${vm_name}` found in Resource Group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    expected=Azure VM `${vm_name}` should have optimal memory utilization in resource group `${resource_group}`
+            ...    actual=Azure VM `${vm_name}` has high available memory of `${memory_percentage}%` in the last `${LOW_MEMORY_TIMEFRAME}` hours in resource group `${resource_group}`
+            ...    title=Underutilized Memory on Azure VM `${vm_name}` found in Resource Group `${resource_group}`
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details=${pretty_vm}
-            ...    next_steps=Resize to a smaller azure VM SKU to better match memory usage requirements in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    next_steps=Resize to a smaller azure VM SKU to better match memory usage requirements in resource group `${AZURE_RESOURCE_GROUP}`
         END
     ELSE
-        RW.Core.Add Pre To Report    "No underutilized VMs based on memory usage found in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
+        RW.Core.Add Pre To Report    "No underutilized VMs based on memory usage found in resource group `${AZURE_RESOURCE_GROUP}`"
     END
 
-List Unused Network Interfaces in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+List Unused Network Interfaces in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Lists network interfaces that are not attached to any virtual machine
     [Tags]    Network    Azure    NIC    Cost    access:read-only
-    CloudCustodian.Core.Generate Policy   
+    CloudCustodian.Core.Generate Policy
     ...    ${CURDIR}/unused-nic.j2
     ...    resourceGroup=${AZURE_RESOURCE_GROUP}
     ${c7n_output}=    RW.CLI.Run Cli
@@ -319,21 +365,21 @@ List Unused Network Interfaces in resource group `${AZURE_RESOURCE_GROUP}` in Su
             ${nic_name}=    Set Variable    ${nic['name']}
             RW.Core.Add Issue
             ...    severity=4
-            ...    expected=Network Interface `${nic_name}` should be attached to a virtual machine in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
-            ...    actual=Network Interface `${nic_name}` is not attached to any virtual machine in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
-            ...    title=Unused Network Interface `${nic_name}` found in Resource Group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    expected=Network Interface `${nic_name}` should be attached to a virtual machine in resource group `${resource_group}`
+            ...    actual=Network Interface `${nic_name}` is not attached to any virtual machine in resource group `${resource_group}`
+            ...    title=Unused Network Interface `${nic_name}` found in Resource Group `${resource_group}`
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details=${pretty_nic}
-            ...    next_steps=Delete the unused network interface to reduce costs in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    next_steps=Delete the unused network interface to reduce costs in resource group `${AZURE_RESOURCE_GROUP}`
         END
     ELSE
-        RW.Core.Add Pre To Report    "No unused network interfaces found in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
+        RW.Core.Add Pre To Report    "No unused network interfaces found in resource group `${AZURE_RESOURCE_GROUP}`"
     END
 
-List Unused Public IPs in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+List Unused Public IPs in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Lists public IP addresses that are not attached to any resource
     [Tags]    Network    Azure    PublicIP    Cost    access:read-only
-    CloudCustodian.Core.Generate Policy   
+    CloudCustodian.Core.Generate Policy
     ...    ${CURDIR}/unused-public-ip.j2
     ...    resourceGroup=${AZURE_RESOURCE_GROUP}
     ${c7n_output}=    RW.CLI.Run Cli
@@ -359,16 +405,17 @@ List Unused Public IPs in resource group `${AZURE_RESOURCE_GROUP}` in Subscripti
             ${ip_name}=    Set Variable    ${ip['name']}
             RW.Core.Add Issue
             ...    severity=4
-            ...    expected=Public IP `${ip_name}` should be attached to a resource in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
-            ...    actual=Public IP `${ip_name}` is not attached to any resource in resource group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
-            ...    title=Unused Public IP `${ip_name}` found in Resource Group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    expected=Public IP `${ip_name}` should be attached to a resource in resource group `${resource_group}`
+            ...    actual=Public IP `${ip_name}` is not attached to any resource in resource group `${resource_group}`
+            ...    title=Unused Public IP `${ip_name}` found in Resource Group `${resource_group}`
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details=${pretty_ip}
-            ...    next_steps=Delete the unused public IP to reduce costs in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    next_steps=Delete the unused public IP to reduce costs in resource group `${AZURE_RESOURCE_GROUP}`
         END
     ELSE
-        RW.Core.Add Pre To Report    "No unused public IPs found in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
+        RW.Core.Add Pre To Report    "No unused public IPs found in resource group `${AZURE_RESOURCE_GROUP}`"
     END
+
 
 *** Keywords ***
 Suite Initialization
@@ -379,12 +426,7 @@ Suite Initialization
     ...    pattern=\w*
     ${AZURE_SUBSCRIPTION_ID}=    RW.Core.Import User Variable    AZURE_SUBSCRIPTION_ID
     ...    type=string
-    ...    description=The Azure Subscription ID for the resource.  
-    ...    pattern=\w*
-    ...    default=""
-    ${AZURE_SUBSCRIPTION_NAME}=    RW.Core.Import User Variable    AZURE_SUBSCRIPTION_NAME
-    ...    type=string
-    ...    description=The Azure Subscription Name.  
+    ...    description=The Azure Subscription ID for the resource.
     ...    pattern=\w*
     ...    default=""
     ${AZURE_RESOURCE_GROUP}=    RW.Core.Import User Variable    AZURE_RESOURCE_GROUP
@@ -445,7 +487,6 @@ Suite Initialization
     ...    pattern=^\d+$
     ...    example=24
     ...    default=24
-    Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${AZURE_SUBSCRIPTION_NAME}
     Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}    ${AZURE_SUBSCRIPTION_ID}
     Set Suite Variable    ${AZURE_RESOURCE_GROUP}    ${AZURE_RESOURCE_GROUP}
     Set Suite Variable    ${HIGH_CPU_PERCENTAGE}    ${HIGH_CPU_PERCENTAGE}
@@ -457,3 +498,6 @@ Suite Initialization
     Set Suite Variable    ${HIGH_MEMORY_TIMEFRAME}    ${HIGH_MEMORY_TIMEFRAME}
     Set Suite Variable    ${LOW_MEMORY_PERCENTAGE}    ${LOW_MEMORY_PERCENTAGE}
     Set Suite Variable    ${LOW_MEMORY_TIMEFRAME}    ${LOW_MEMORY_TIMEFRAME}
+    Set Suite Variable
+    ...    ${env}
+    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}"}
