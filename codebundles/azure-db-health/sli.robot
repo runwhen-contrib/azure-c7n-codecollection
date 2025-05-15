@@ -14,7 +14,7 @@ Library    CloudCustodian.Core
 
 Suite Setup         Suite Initialization
 *** Tasks ***
-Count Database Availability in resource group `${AZURE_RESOURCE_GROUP}`
+Score Database Availability in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Count databases that have availability below 100%
     [Tags]    Database    Azure    Availability    access:read-only
     ${db_map}=    Evaluate    json.load(open('${CURDIR}/db-map.json'))    json

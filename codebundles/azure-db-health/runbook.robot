@@ -480,7 +480,7 @@ List Database Resource Health in resource group `${AZURE_RESOURCE_GROUP}`
 
     ${formatted_results}=    RW.CLI.Run Cli
     ...    cmd=jq -r '["DatabaseName", "Type", "ResourceGroup", "Status", "Reason"] as $headers | [$headers] + [.[] | [.dbName, (.displayName | gsub(" "; "_")), "${AZURE_RESOURCE_GROUP}", .properties.availabilityState, (.properties.reasonType // "Unknown")]] | .[] | @tsv' ${json_file} | column -t
-    RW.Core.Add Pre To Report    Unhealthy Databases:\n=====================================================\n${formatted_results.stdout}
+    RW.Core.Add Pre To Report    Database Summary:\n=====================================================\n${formatted_results.stdout}
 
     # Report on unhealthy databases and add issues
     IF    len(@{unhealthy_dbs}) > 0

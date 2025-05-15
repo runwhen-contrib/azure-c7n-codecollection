@@ -1,5 +1,5 @@
 resource_group = "azure-db-health"
-location       = "Central India"
+location       = "centralus"
 tags = {
   "env" : "test",
   "lifecycle" : "deleteme",

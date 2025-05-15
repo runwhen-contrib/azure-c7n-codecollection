@@ -15,3 +15,7 @@ variable "tags" {
 variable "sp_principal_id" {
   type = string
 }
+variable "name_prefix" {
+  default     = "postgresqlfs"
+  description = "Prefix of the resource name."
+}
