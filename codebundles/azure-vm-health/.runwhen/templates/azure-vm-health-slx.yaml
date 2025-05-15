@@ -18,7 +18,6 @@ spec:
   statement: The health of Azure VMs is measured by counts of VMs with public IPs, high CPU/memory usage, stopped/underutilized VMs, and unused NICs/IPs, with a composite score assessing overall health.
   additionalContext:
     name: "{{match_resource.resource.name}}"
-    tags: "{{match_resource.tags}}"
     qualified_name: "{{ match_resource.qualified_name }}"
     resource_group: "{{ match_resource.resource_group.name }}"
     subscription_id: "{{ match_resource.subscription_id }}"

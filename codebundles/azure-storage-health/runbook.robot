@@ -16,8 +16,8 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-List Azure Storage Health in resource group `${AZURE_RESOURCE_GROUP}`
-    [Documentation]    List Azure storage health by identifying unused disks, snapshots, and storage accounts
+Check Azure Storage Resource Health in resource group `${AZURE_RESOURCE_GROUP}`
+    [Documentation]    Check the Azure Resource Health API for any known issues affecting storage resources
     [Tags]    Storage    Azure    Health    access:read-only
     ${output}=    RW.CLI.Run Bash File
     ...    bash_file=azure_storage_health_check.sh
