@@ -517,6 +517,50 @@ List Database Resource Health in resource group `${AZURE_RESOURCE_GROUP}`
     
     RW.Core.Add Pre To Report    Database Health Summary:\n=====================================================\nTotal Databases: ${total_count}\nHealthy Databases: ${healthy_count}\nUnhealthy Databases: ${unhealthy_count}
 
+List Database Changes in resource group `${AZURE_RESOURCE_GROUP}`
+    [Documentation]    Lists database changes in the specified resource group
+    [Tags]    Database    Azure    Audit    access:read-only
+    ${log_file}=    Set Variable    db_changes_grouped.json
+    ${output}=    RW.CLI.Run Bash File
+    ...    bash_file=get-db-changes.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ...    show_in_rwl_cheatsheet=true
+    ${report_data}=    RW.CLI.Run Cli
+    ...    cmd=cat ${log_file}
+    TRY
+        ${changes_list}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
+    EXCEPT
+        Log    Failed to load JSON payload, defaulting to empty list.    WARN
+        ${changes_list}=    Create Dictionary
+    END
+
+    IF    len(${changes_list}) > 0
+        # Loop through each database in the grouped changes
+        ${all_changes}=    Create List
+        
+        FOR    ${db_name}    IN    @{changes_list.keys()}
+            ${db_changes}=    Set Variable    ${changes_list["${db_name}"]}
+            ${db_type}=    Set Variable    ${db_changes[0]["dbType"]}
+            ${display_name}=    Set Variable    ${db_changes[0]["displayName"]}
+            
+            # Format changes for this database
+            RW.Core.Add Pre To Report    Changes for ${display_name} (${db_name}):\n-----------------------------------------------------
+            
+            # Format changes for this specific database
+            ${db_changes_json}=    Evaluate    json.dumps(${db_changes})    json
+            ${formatted_db_results}=    RW.CLI.Run Cli
+            ...    cmd=printf '%s' '${db_changes_json}' | jq -r '["Operation", "Timestamp", "Caller", "Status", "ResourceUrl"] as $headers | [$headers] + [.[] | [.operationName, .timestamp, .caller, .changeStatus, .resourceUrl]] | .[] | @tsv' | column -t -s $'\t'
+            RW.Core.Add Pre To Report    ${formatted_db_results.stdout}\n
+            
+        END
+    ELSE
+        RW.Core.Add Pre To Report    No database changes found in resource group `${AZURE_RESOURCE_GROUP}`
+    END
+    RW.CLI.Run Cli
+    ...    cmd=rm ${log_file}
+
 
 *** Keywords ***
 Suite Initialization
@@ -588,6 +632,12 @@ Suite Initialization
     ...    pattern=^\w+$
     ...    example=PT1H
     ...    default=PT1H
+    ${AZURE_ACTIVITY_LOG_OFFSET}=    RW.Core.Import User Variable    AZURE_ACTIVITY_LOG_OFFSET
+    ...    type=string
+    ...    description=The time offset to check for activity logs in this formats 24h, 1h, 1d etc.
+    ...    pattern=^\w+$
+    ...    example=24h
+    ...    default=24h
     Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}    ${AZURE_SUBSCRIPTION_ID}
     Set Suite Variable    ${AZURE_RESOURCE_GROUP}    ${AZURE_RESOURCE_GROUP}
     Set Suite Variable    ${HIGH_CPU_PERCENTAGE}    ${HIGH_CPU_PERCENTAGE}
@@ -599,6 +649,7 @@ Suite Initialization
     Set Suite Variable    ${LOW_AVAILABILITY_THRESHOLD}    ${LOW_AVAILABILITY_THRESHOLD}
     Set Suite Variable    ${LOW_AVAILABILITY_TIMEFRAME}    ${LOW_AVAILABILITY_TIMEFRAME}
     Set Suite Variable    ${LOW_AVAILABILITY_INTERVAL}    ${LOW_AVAILABILITY_INTERVAL}
+    Set Suite Variable    ${AZURE_ACTIVITY_LOG_OFFSET}    ${AZURE_ACTIVITY_LOG_OFFSET}
     Set Suite Variable
     ...    ${env}
-    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}"}
+    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}", "AZURE_ACTIVITY_LOG_OFFSET":"${AZURE_ACTIVITY_LOG_OFFSET}"}
