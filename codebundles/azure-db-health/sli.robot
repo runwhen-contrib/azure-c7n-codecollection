@@ -269,7 +269,7 @@ Count Databases With Health Issues in resource group `${AZURE_RESOURCE_GROUP}`
     ${script_result}=    RW.CLI.Run Bash File
     ...    bash_file=get-db-health.sh
     ...    env=${env}
-    ...    timeout_seconds=180
+    ...    timeout_seconds=200
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     
