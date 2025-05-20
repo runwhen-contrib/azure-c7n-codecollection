@@ -12,6 +12,7 @@ Library             RW.CLI
 Library             RW.platform
 Library    CloudCustodian.Core
 Library    Collections
+Library    DateTime
 
 Suite Setup         Suite Initialization
 
@@ -560,6 +561,47 @@ List Database Changes in resource group `${AZURE_RESOURCE_GROUP}`
             ...    cmd=printf '%s' '${db_changes_json}' | jq -r '["Operation", "Timestamp", "Caller", "Status", "ResourceUrl"] as $headers | [$headers] + [.[] | [.operationName, .timestamp, .caller, .changeStatus, .resourceUrl]] | .[] | @tsv' | column -t -s $'\t'
             RW.Core.Add Pre To Report    ${formatted_db_results.stdout}\n
             
+            # Check for recent changes within AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE timeframe
+            ${current_time}=    DateTime.Get Current Date    result_format=datetime
+            ${current_time_iso}=    Convert Date    ${current_time}    result_format=%Y-%m-%dT%H:%M:%SZ
+            ${recent_changes}=    Create List
+            
+            FOR    ${change}    IN    @{db_changes}
+                ${change_time}=    Set Variable    ${change["timestamp"]}
+                # Extract just the date and time part without fractional seconds
+                ${change_time_simple}=    Evaluate    re.match(r'(\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2})', '${change_time}').group(1)    modules=re
+                ${change_time_obj}=    Convert Date    ${change_time_simple}    date_format=%Y-%m-%dT%H:%M:%S
+                ${time_diff}=    Subtract Date From Date    ${current_time}    ${change_time_obj}
+                
+                # Convert AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE to seconds
+                ${lookback_seconds}=    Run Keyword If    '${AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE}'.endswith('h')    Evaluate    int('${AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE}'.replace('h', '')) * 3600
+                ...    ELSE IF    '${AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE}'.endswith('m')    Evaluate    int('${AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE}'.replace('m', '')) * 60
+                ...    ELSE IF    '${AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE}'.endswith('d')    Evaluate    int('${AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE}'.replace('d', '')) * 86400
+                ...    ELSE    Evaluate    int('${AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE}')
+                
+                # If change is within lookback period, add to recent changes
+                IF    ${time_diff} <= ${lookback_seconds}
+                    Append To List    ${recent_changes}    ${change}
+                END
+            END
+            
+            # Raise issues for recent changes
+            FOR    ${change}    IN    @{recent_changes}
+                ${pretty_change}=    Evaluate    pprint.pformat(${change})    modules=pprint
+                ${operation}=    Set Variable    ${change['operationName']}
+                ${caller}=    Set Variable    ${change['caller']}
+                ${timestamp}=    Set Variable    ${change['timestamp']}
+                ${resource_url}=    Set Variable    ${change['resourceUrl']}
+                
+                RW.Core.Add Issue
+                ...    severity=4
+                ...    expected=Changes to ${display_name} `${db_name}` should be reviewed in resource group `${AZURE_RESOURCE_GROUP}`
+                ...    actual=Recent change detected: ${operation} by ${caller} at ${timestamp}
+                ...    title=Recent Database Change: ${operation} on ${display_name} `${db_name}` in Resource Group `${AZURE_RESOURCE_GROUP}`
+                ...    details=${pretty_change}
+                ...    reproduce_hint=${output.cmd}
+                ...    next_steps=Review the recent change in Azure Portal: ${resource_url}
+            END
         END
     ELSE
         RW.Core.Add Pre To Report    No database changes found in resource group `${AZURE_RESOURCE_GROUP}`
@@ -638,12 +680,18 @@ Suite Initialization
     ...    pattern=^\w+$
     ...    example=PT1H
     ...    default=PT1H
-    ${AZURE_ACTIVITY_LOG_OFFSET}=    RW.Core.Import User Variable    AZURE_ACTIVITY_LOG_OFFSET
+    ${AZURE_ACTIVITY_LOG_LOOKBACK}=    RW.Core.Import User Variable    AZURE_ACTIVITY_LOG_LOOKBACK
     ...    type=string
     ...    description=The time offset to check for activity logs in this formats 24h, 1h, 1d etc.
     ...    pattern=^\w+$
     ...    example=24h
     ...    default=24h
+    ${AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE}=    RW.Core.Import User Variable    AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE
+    ...    type=string
+    ...    description=The time offset to check for activity logs to raise an issue in this formats 24h, 1h, 1d etc.
+    ...    pattern=^\w+$
+    ...    example=1h
+    ...    default=1h
     Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}    ${AZURE_SUBSCRIPTION_ID}
     Set Suite Variable    ${AZURE_RESOURCE_GROUP}    ${AZURE_RESOURCE_GROUP}
     Set Suite Variable    ${HIGH_CPU_PERCENTAGE}    ${HIGH_CPU_PERCENTAGE}
@@ -655,7 +703,8 @@ Suite Initialization
     Set Suite Variable    ${LOW_AVAILABILITY_THRESHOLD}    ${LOW_AVAILABILITY_THRESHOLD}
     Set Suite Variable    ${LOW_AVAILABILITY_TIMEFRAME}    ${LOW_AVAILABILITY_TIMEFRAME}
     Set Suite Variable    ${LOW_AVAILABILITY_INTERVAL}    ${LOW_AVAILABILITY_INTERVAL}
-    Set Suite Variable    ${AZURE_ACTIVITY_LOG_OFFSET}    ${AZURE_ACTIVITY_LOG_OFFSET}
+    Set Suite Variable    ${AZURE_ACTIVITY_LOG_LOOKBACK}    ${AZURE_ACTIVITY_LOG_LOOKBACK}
+    Set Suite Variable    ${AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE}    ${AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE}
     Set Suite Variable
     ...    ${env}
-    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}", "AZURE_ACTIVITY_LOG_OFFSET":"${AZURE_ACTIVITY_LOG_OFFSET}"}
+    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}", "AZURE_ACTIVITY_LOG_OFFSET":"${AZURE_ACTIVITY_LOG_LOOKBACK}", "AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE":"${AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE}"}
