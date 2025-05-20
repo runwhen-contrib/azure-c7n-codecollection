@@ -551,15 +551,13 @@ List Database Changes in resource group `${AZURE_RESOURCE_GROUP}`
             ${db_changes}=    Set Variable    ${changes_list["${db_name}"]}
             ${db_type}=    Set Variable    ${db_changes[0]["dbType"]}
             ${display_name}=    Set Variable    ${db_changes[0]["displayName"]}
-            
-            # Format changes for this database
-            RW.Core.Add Pre To Report    Changes for ${display_name} (${db_name}):\n-----------------------------------------------------
+
             
             # Format changes for this specific database
             ${db_changes_json}=    Evaluate    json.dumps(${db_changes})    json
             ${formatted_db_results}=    RW.CLI.Run Cli
             ...    cmd=printf '%s' '${db_changes_json}' | jq -r '["Operation", "Timestamp", "Caller", "Status", "ResourceUrl"] as $headers | [$headers] + [.[] | [.operationName, .timestamp, .caller, .changeStatus, .resourceUrl]] | .[] | @tsv' | column -t -s $'\t'
-            RW.Core.Add Pre To Report    ${formatted_db_results.stdout}\n
+            RW.Core.Add Pre To Report    Changes for ${display_name} (${db_name}):\n-----------------------------------------------------\n${formatted_db_results.stdout}\n
             
             # Check for recent changes within AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE timeframe
             ${current_time}=    DateTime.Get Current Date    result_format=datetime
