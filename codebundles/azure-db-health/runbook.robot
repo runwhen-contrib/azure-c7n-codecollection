@@ -40,6 +40,7 @@ List Database Availability in resource group `${AZURE_RESOURCE_GROUP}`
         ...    interval=${LOW_AVAILABILITY_INTERVAL}    
         ${c7n_output}=    RW.CLI.Run Cli
         ...    cmd=custodian run -s azure-c7n-db-health availability.yaml --cache-period 0
+        ...    timeout_seconds=180
         
         ${report_data}=    RW.CLI.Run Cli
         ...    cmd=cat azure-c7n-db-health/${policy_name}/resources.json
@@ -164,6 +165,7 @@ List Databases Without Replication in resource group `${AZURE_RESOURCE_GROUP}`
         RW.CLI.Run Cli    cmd=cat ${CURDIR}/replication-check.yaml    # Log generated policy
         ${c7n_output}=    RW.CLI.Run Cli
         ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-db-health ${CURDIR}/replication-check.yaml --cache-period 0
+        ...    timeout_seconds=180
         
         ${report_data}=    RW.CLI.Run Cli
         ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-db-health/${policy_name}/resources.json
@@ -224,6 +226,7 @@ List Databases Without High Availability in resource group `${AZURE_RESOURCE_GRO
         RW.CLI.Run Cli    cmd=cat ${CURDIR}/ha-check.yaml    # Log generated policy
         ${c7n_output}=    RW.CLI.Run Cli
         ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-db-health ${CURDIR}/ha-check.yaml --cache-period 0
+        ...    timeout_seconds=180
         ${report_data}=    RW.CLI.Run Cli
         ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-db-health/${policy_name}/resources.json
         RW.CLI.Run Cli    cmd=rm ${CURDIR}/ha-check.yaml    # Remove generated policy
@@ -282,6 +285,7 @@ List Databases With High CPU Usage in resource group `${AZURE_RESOURCE_GROUP}`
         RW.CLI.Run Cli    cmd=cat ${CURDIR}/high-cpu.yaml    # Log generated policy
         ${c7n_output}=    RW.CLI.Run Cli
         ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-db-health ${CURDIR}/high-cpu.yaml --cache-period 0
+        ...    timeout_seconds=180
         ${report_data}=    RW.CLI.Run Cli
         ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-db-health/${policy_name}/resources.json
         RW.CLI.Run Cli    cmd=rm ${CURDIR}/high-cpu.yaml    # Remove generated policy
@@ -344,6 +348,7 @@ List All Databases With High Memory Usage in resource group `${AZURE_RESOURCE_GR
         RW.CLI.Run Cli    cmd=cat ${CURDIR}/high-memory.yaml    # Log generated policy
         ${c7n_output}=    RW.CLI.Run Cli
         ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-db-health ${CURDIR}/high-memory.yaml --cache-period 0
+        ...    timeout_seconds=180
         ${report_data}=    RW.CLI.Run Cli
         ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-db-health/${policy_name}/resources.json
         RW.CLI.Run Cli    cmd=rm ${CURDIR}/high-memory.yaml    # Remove generated policy
@@ -401,6 +406,7 @@ List Redis Caches With High Cache Miss Rate in resource group `${AZURE_RESOURCE_
     RW.CLI.Run Cli    cmd=cat ${CURDIR}/redis-cache-miss.yaml    # Log generated policy
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-db-health ${CURDIR}/redis-cache-miss.yaml --cache-period 0
+    ...    timeout_seconds=180
     
     ${report_data}=    RW.CLI.Run Cli
     ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-db-health/${policy_name}/resources.json
@@ -450,7 +456,7 @@ List Database Resource Health in resource group `${AZURE_RESOURCE_GROUP}`
     ${script_result}=    RW.CLI.Run Bash File
     ...    bash_file=get-db-health.sh
     ...    env=${env}
-    ...    timeout_seconds=180
+    ...    timeout_seconds=200
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     
@@ -524,7 +530,7 @@ List Database Changes in resource group `${AZURE_RESOURCE_GROUP}`
     ${output}=    RW.CLI.Run Bash File
     ...    bash_file=get-db-changes.sh
     ...    env=${env}
-    ...    timeout_seconds=180
+    ...    timeout_seconds=200
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     ${report_data}=    RW.CLI.Run Cli
