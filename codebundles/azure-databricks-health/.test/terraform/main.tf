@@ -19,21 +19,34 @@ resource "azurerm_databricks_workspace" "databricks" {
 }
 
 # Create a Databricks cluster
-# resource "azurerm_databricks_cluster" "cluster" {
-#   name                   = "test-cluster"
-#   workspace_id           = azurerm_databricks_workspace.databricks.id
-#   spark_version          = "11.3.x-scala2.12"
-#   node_type_id           = "Standard_DS3_v2"
-#   autotermination_minutes = 20
-#   min_workers            = 1
-#   max_workers            = 2
+resource "databricks_cluster" "cluster" {
+  cluster_name            = "${random_pet.name_prefix.id}-dbx-cluster"
+  spark_version           = "15.4.x-scala2.12"
+  node_type_id            = "Standard_D3_v2"
+  driver_node_type_id     = "Standard_D3_v2"
+  autotermination_minutes = 120
+  num_workers             = 0
+  data_security_mode      = "LEGACY_SINGLE_USER_STANDARD"
+  runtime_engine          = "PHOTON"
+  enable_elastic_disk     = true
 
-#   spark_conf = {
-#     "spark.databricks.cluster.profile" = "singleNode"
-#     "spark.master"                      = "local[*]"
-#   }
+  spark_conf = {
+    "spark.databricks.cluster.profile" = "singleNode"
+    "spark.master"                     = "local[*, 4]"
+  }
 
-#   custom_tags = {
-#     "ResourceClass" = "SingleNode"
-#   }
-# }
+  spark_env_vars = {
+    "PYSPARK_PYTHON" = "/databricks/python3/bin/python3"
+  }
+
+  azure_attributes {
+    first_on_demand    = 1
+    availability       = "SPOT_WITH_FALLBACK_AZURE"
+    spot_bid_max_price = -1
+  }
+
+  custom_tags = {
+    "ResourceClass" = "SingleNode"
+  }
+}
+
