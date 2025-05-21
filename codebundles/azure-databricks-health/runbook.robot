@@ -1,0 +1,136 @@
+*** Settings ***
+Documentation       List Databricks changes
+Metadata            Author    saurabh3460
+Metadata            Display Name    Azure Databricks Health
+Metadata            Supports    Azure    Databricks    Health    CloudCustodian
+Force Tags          Azure    Databricks    Health    CloudCustodian    cosmosdb    sql    redis    postgresql    availability
+
+Library    String
+Library             BuiltIn
+Library             RW.Core
+Library             RW.CLI
+Library             RW.platform
+Library    CloudCustodian.Core
+Library    Collections
+Library    DateTime
+
+Suite Setup         Suite Initialization
+
+
+*** Tasks ***
+List Databricks Changes in resource group `${AZURE_RESOURCE_GROUP}`
+    [Documentation]    Lists Databricks changes in the specified resource group
+    [Tags]    Databricks    Azure    Audit    access:read-only
+    ${log_file}=    Set Variable    dbx_changes_grouped.json
+    ${output}=    RW.CLI.Run Bash File
+    ...    bash_file=get-dbx-changes.sh
+    ...    env=${env}
+    ...    timeout_seconds=200
+    ...    include_in_history=false
+    ...    show_in_rwl_cheatsheet=true
+    ${report_data}=    RW.CLI.Run Cli
+    ...    cmd=cat ${log_file}
+    TRY
+        ${changes_list}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
+    EXCEPT
+        Log    Failed to load JSON payload, defaulting to empty list.    WARN
+        ${changes_list}=    Create Dictionary
+    END
+
+    IF    len(${changes_list}) > 0
+        # Loop through each Databricks workspace in the grouped changes
+        ${all_changes}=    Create List
+        
+        FOR    ${dbx_name}    IN    @{changes_list.keys()}
+            ${dbx_changes}=    Set Variable    ${changes_list["${dbx_name}"]}
+            ${display_name}=    Set Variable    ${dbx_changes[0]["displayName"]}
+
+            
+            # Format changes for this specific Databricks workspace
+            ${dbx_changes_json}=    Evaluate    json.dumps(${dbx_changes})    json
+            ${formatted_dbx_results}=    RW.CLI.Run Cli
+            ...    cmd=printf '%s' '${dbx_changes_json}' | jq -r '["Operation", "Timestamp", "Caller", "Status", "ResourceUrl"] as $headers | [$headers] + [.[] | [.operationName, .timestamp, .caller, .changeStatus, .resourceUrl]] | .[] | @tsv' | column -t -s $'\t'
+            RW.Core.Add Pre To Report    Changes for ${display_name} (${dbx_name}):\n-----------------------------------------------------\n${formatted_dbx_results.stdout}\n
+            
+            # Check for recent changes within AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE timeframe
+            ${current_time}=    DateTime.Get Current Date    result_format=datetime
+            ${current_time_iso}=    Convert Date    ${current_time}    result_format=%Y-%m-%dT%H:%M:%SZ
+            ${recent_changes}=    Create List
+            
+            FOR    ${change}    IN    @{dbx_changes}
+                ${change_time}=    Set Variable    ${change["timestamp"]}
+                # Extract just the date and time part without fractional seconds
+                ${change_time_simple}=    Evaluate    re.match(r'(\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2})', '${change_time}').group(1)    modules=re
+                ${change_time_obj}=    Convert Date    ${change_time_simple}    date_format=%Y-%m-%dT%H:%M:%S
+                ${time_diff}=    Subtract Date From Date    ${current_time}    ${change_time_obj}
+                
+                # Convert AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE to seconds
+                ${lookback_seconds}=    Run Keyword If    '${AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE}'.endswith('h')    Evaluate    int('${AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE}'.replace('h', '')) * 3600
+                ...    ELSE IF    '${AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE}'.endswith('m')    Evaluate    int('${AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE}'.replace('m', '')) * 60
+                ...    ELSE IF    '${AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE}'.endswith('d')    Evaluate    int('${AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE}'.replace('d', '')) * 86400
+                ...    ELSE    Evaluate    int('${AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE}')
+                
+                # If change is within lookback period, add to recent changes
+                IF    ${time_diff} <= ${lookback_seconds}
+                    Append To List    ${recent_changes}    ${change}
+                END
+            END
+            
+            # Raise issues for recent changes
+            FOR    ${change}    IN    @{recent_changes}
+                ${pretty_change}=    Evaluate    pprint.pformat(${change})    modules=pprint
+                ${operation}=    Set Variable    ${change['operationName']}
+                ${caller}=    Set Variable    ${change['caller']}
+                ${timestamp}=    Set Variable    ${change['timestamp']}
+                ${resource_url}=    Set Variable    ${change['resourceUrl']}
+                
+                RW.Core.Add Issue
+                ...    severity=4
+                ...    expected=Changes to ${display_name} `${dbx_name}` should be reviewed in resource group `${AZURE_RESOURCE_GROUP}`
+                ...    actual=Recent change detected: ${operation} by ${caller} at ${timestamp}
+                ...    title=Recent Databricks Change: ${operation} on ${display_name} `${dbx_name}` in Resource Group `${AZURE_RESOURCE_GROUP}`
+                ...    details=${pretty_change}
+                ...    reproduce_hint=${output.cmd}
+                ...    next_steps=Review the recent change in Azure Portal: ${resource_url}
+            END
+        END
+    ELSE
+        RW.Core.Add Pre To Report    No Databricks changes found in resource group `${AZURE_RESOURCE_GROUP}`
+    END
+    RW.CLI.Run Cli
+    ...    cmd=rm ${log_file}
+*** Keywords ***
+Suite Initialization
+    ${azure_credentials}=    RW.Core.Import Secret
+    ...    azure_credentials
+    ...    type=string
+    ...    description=The secret containing AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID
+    ...    pattern=\w*
+    ${AZURE_SUBSCRIPTION_ID}=    RW.Core.Import User Variable    AZURE_SUBSCRIPTION_ID
+    ...    type=string
+    ...    description=The Azure Subscription ID for the resource.  
+    ...    pattern=\w*
+    ...    default=""
+    ${AZURE_RESOURCE_GROUP}=    RW.Core.Import User Variable    AZURE_RESOURCE_GROUP
+    ...    type=string
+    ...    description=Azure resource group.
+    ...    pattern=\w*
+    ${AZURE_ACTIVITY_LOG_LOOKBACK}=    RW.Core.Import User Variable    AZURE_ACTIVITY_LOG_LOOKBACK
+    ...    type=string
+    ...    description=The time offset to check for activity logs in this formats 24h, 1h, 1d etc.
+    ...    pattern=^\w+$
+    ...    example=24h
+    ...    default=24h
+    ${AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE}=    RW.Core.Import User Variable    AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE
+    ...    type=string
+    ...    description=The time offset to check for activity logs to raise an issue in this formats 24h, 1h, 1d etc.
+    ...    pattern=^\w+$
+    ...    example=1h
+    ...    default=1h
+    Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}    ${AZURE_SUBSCRIPTION_ID}
+    Set Suite Variable    ${AZURE_RESOURCE_GROUP}    ${AZURE_RESOURCE_GROUP}
+    Set Suite Variable    ${AZURE_ACTIVITY_LOG_LOOKBACK}    ${AZURE_ACTIVITY_LOG_LOOKBACK}
+    Set Suite Variable    ${AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE}    ${AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE}
+    Set Suite Variable
+    ...    ${env}
+    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}", "AZURE_ACTIVITY_LOG_LOOKBACK":"${AZURE_ACTIVITY_LOG_LOOKBACK}", "AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE":"${AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE}"}
