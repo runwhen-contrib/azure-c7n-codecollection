@@ -50,3 +50,10 @@ resource "databricks_cluster" "cluster" {
   }
 }
 
+// create PAT token to provision entities within workspace
+resource "databricks_token" "pat" {
+  provider = databricks
+  comment  = "Terraform Provisioning"
+  // 24 hour token
+  lifetime_seconds = 86400
+}

@@ -28,3 +28,9 @@ output "export_commands" {
   ])
   description = "Copy-paste ready export commands for use in shell or Robot Framework env block"
 }
+
+// output token for other modules
+output "databricks_token" {
+  value     = databricks_token.pat.token_value
+  sensitive = true
+}
