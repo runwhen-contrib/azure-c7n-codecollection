@@ -1,5 +1,5 @@
 *** Settings ***
-Documentation       List Databricks changes
+Documentation       List Databricks changes and cluster status
 Metadata            Author    saurabh3460
 Metadata            Display Name    Azure Databricks Health
 Metadata            Supports    Azure    Databricks    Health    CloudCustodian
@@ -99,6 +99,68 @@ List Databricks Changes in resource group `${AZURE_RESOURCE_GROUP}`
     END
     RW.CLI.Run Cli
     ...    cmd=rm ${log_file}
+
+List Databricks Cluster Status in resource group `${AZURE_RESOURCE_GROUP}`
+    [Documentation]    Lists Databricks cluster status
+    [Tags]    Databricks    Azure    Audit    access:read-only
+    ${status_file}=    Set Variable    cluster_status.json
+    ${output}=    RW.CLI.Run Bash File
+    ...    bash_file=get-dbx-cluster-status.sh
+    ...    env=${env}
+    ...    secret__databricks_host=${DATABRICKS_HOST}
+    ...    secret__databricks_token=${DATABRICKS_TOKEN}
+    ...    timeout_seconds=200
+    ...    include_in_history=false
+    ...    show_in_rwl_cheatsheet=true
+    
+    ${status_data}=    RW.CLI.Run Cli
+    ...    cmd=cat ${status_file}
+    TRY
+        ${cluster_status}=    Evaluate    json.loads(r'''${status_data.stdout}''')    json
+    EXCEPT
+        Log    Failed to load JSON payload, defaulting to empty list.    WARN
+        ${cluster_status}=    Create List
+    END
+    
+    IF    len(${cluster_status}) > 0
+        ${cluster_status_json}=    Evaluate    json.dumps(${cluster_status})    json
+        ${formatted_cluster_results}=    RW.CLI.Run Cli
+        ...    cmd=printf '%s' '${cluster_status_json}' | jq -r '["Workspace", "Cluster Name", "State", "Message", "Workspace URL"] as $headers | [$headers] + [.[] | [.workspace, .cluster_name, .state, .message, .workspace_url]] | .[] | @tsv' | column -t -s $'\t'
+        RW.Core.Add Pre To Report    Databricks Cluster Status in Resource Group `${AZURE_RESOURCE_GROUP}`:\n-----------------------------------------------------\n${formatted_cluster_results.stdout}\n
+        
+        
+        # Process each cluster status entry
+        FOR    ${cluster}    IN    @{cluster_status}
+            ${workspace}=    Set Variable    ${cluster["workspace"]}
+            ${cluster_name}=    Set Variable    ${cluster["cluster_name"]}
+            ${state}=    Set Variable    ${cluster["state"]}
+            ${status}=    Set Variable    ${cluster["status"]}
+            ${message}=    Set Variable    ${cluster["message"]}
+
+            # Raise issues for problematic clusters
+            IF    '${state}' == 'PENDING' or '${state}' == 'ERROR'
+                ${workspace_url}=    Set Variable    ${cluster["workspace_url"]}
+                ${cluster_id}=    Set Variable    ${cluster["cluster_id"]}
+                ${dbx_url}=    Set Variable    https://${workspace_url}/#/setting/clusters/${cluster_id}/configuration
+                
+                RW.Core.Add Issue
+                ...    severity=3
+                ...    expected=Databricks cluster `${cluster_name}` should be in any of these states: RUNNING, RESIZING, TERMINATED
+                ...    actual=Databricks cluster `${cluster_name}` is in `${state}` state
+                ...    title=Databricks Cluster `${cluster_name}` is in `${state}` state in Resource Group `${AZURE_RESOURCE_GROUP}`
+                ...    details=${cluster}
+                ...    reproduce_hint=${output.cmd}
+                ...    next_steps=Check the Databricks cluster state in resource group `${AZURE_RESOURCE_GROUP}`
+            END
+        END
+    ELSE
+        RW.Core.Add Pre To Report    No Databricks clusters found in resource group `${AZURE_RESOURCE_GROUP}`
+    END
+    
+    # Clean up the temporary files
+    RW.CLI.Run Cli
+    ...    cmd=rm ${status_file}
+
 *** Keywords ***
 Suite Initialization
     ${azure_credentials}=    RW.Core.Import Secret
@@ -115,6 +177,20 @@ Suite Initialization
     ...    type=string
     ...    description=Azure resource group.
     ...    pattern=\w*
+    ${DATABRICKS_HOST}=    RW.Core.Import Secret    DATABRICKS_HOST
+    ...    type=string
+    ...    description=Azure Databricks host.
+    ...    pattern=\w*
+    ${DATABRICKS_TOKEN}=    RW.Core.Import Secret    DATABRICKS_TOKEN
+    ...    type=string
+    ...    description=Azure Databricks token.
+    ...    pattern=\w*
+    ${PENDING_TIMEOUT}=    RW.Core.Import User Variable    PENDING_TIMEOUT
+    ...    type=string
+    ...    description=The time in minutes to check for pending clusters.
+    ...    pattern=^\w+$
+    ...    example=30
+    ...    default=30
     ${AZURE_ACTIVITY_LOG_LOOKBACK}=    RW.Core.Import User Variable    AZURE_ACTIVITY_LOG_LOOKBACK
     ...    type=string
     ...    description=The time offset to check for activity logs in this formats 24h, 1h, 1d etc.
@@ -131,6 +207,9 @@ Suite Initialization
     Set Suite Variable    ${AZURE_RESOURCE_GROUP}    ${AZURE_RESOURCE_GROUP}
     Set Suite Variable    ${AZURE_ACTIVITY_LOG_LOOKBACK}    ${AZURE_ACTIVITY_LOG_LOOKBACK}
     Set Suite Variable    ${AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE}    ${AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE}
+    Set Suite Variable    ${DATABRICKS_HOST}    ${DATABRICKS_HOST}
+    Set Suite Variable    ${DATABRICKS_TOKEN}    ${DATABRICKS_TOKEN}
+    Set Suite Variable    ${PENDING_TIMEOUT}    ${PENDING_TIMEOUT}
     Set Suite Variable
     ...    ${env}
-    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}", "AZURE_ACTIVITY_LOG_LOOKBACK":"${AZURE_ACTIVITY_LOG_LOOKBACK}", "AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE":"${AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE}"}
+    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}", "AZURE_ACTIVITY_LOG_LOOKBACK":"${AZURE_ACTIVITY_LOG_LOOKBACK}", "AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE":"${AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE}", "PENDING_TIMEOUT":"${PENDING_TIMEOUT}"}
