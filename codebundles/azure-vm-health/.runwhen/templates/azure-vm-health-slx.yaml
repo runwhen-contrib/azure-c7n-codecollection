@@ -16,8 +16,12 @@ spec:
   owners:
   - {{workspace.owner_email}}
   statement: The health of Azure VMs is measured by counts of VMs with public IPs, high CPU/memory usage, stopped/underutilized VMs, and unused NICs/IPs, with a composite score assessing overall health.
-  additionalContext:
-    name: "{{match_resource.resource.name}}"
+  additionalContext:  
+    {% include "azure-hierarchy.yaml" ignore missing %}
     qualified_name: "{{ match_resource.qualified_name }}"
-    resource_group: "{{ match_resource.resource_group.name }}"
-    subscription_id: "{{ match_resource.subscription_id }}"
+  tags:
+    {% include "azure-tags.yaml" ignore missing %}
+    - name: service
+      value: virtualmachine
+    - name: access
+      value: read-only

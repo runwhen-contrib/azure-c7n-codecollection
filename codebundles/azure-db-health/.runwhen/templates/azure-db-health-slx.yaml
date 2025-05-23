@@ -16,14 +16,11 @@ spec:
   owners:
   - {{workspace.owner_email}}
   statement: The health of Azure databases is measured by evaluating multiple factors like public accessibility, replication status, high availability configuration, CPU utilization, memory usage, and cache performance.
-  additionalContext:
-    name: "{{match_resource.resource.name}}"
+  additionalContext:  
+    {% include "azure-hierarchy.yaml" ignore missing %}
     qualified_name: "{{ match_resource.qualified_name }}"
-    resource_group: "{{ match_resource.resource_group.name }}"
-    subscription_id: "{{ match_resource.subscription_id }}"
   tags:
-    - name: cloud
-      value: azure
+    {% include "azure-tags.yaml" ignore missing %}
     - name: service
       value: database
     - name: access
