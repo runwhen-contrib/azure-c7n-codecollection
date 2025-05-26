@@ -48,6 +48,12 @@ resource "databricks_cluster" "cluster" {
   custom_tags = {
     "ResourceClass" = "SingleNode"
   }
+
+  lifecycle {
+    ignore_changes = [
+      single_user_name
+    ]
+  }
 }
 
 // create PAT token to provision entities within workspace
@@ -56,4 +62,30 @@ resource "databricks_token" "pat" {
   comment  = "Terraform Provisioning"
   // 24 hour token
   lifetime_seconds = 86400
+}
+
+
+resource "databricks_job" "simple_job" {
+  name = "${random_pet.name_prefix.id}-job"
+
+  task {
+    task_key            = "hello_task"
+    existing_cluster_id = databricks_cluster.cluster.id
+
+    notebook_task {
+      notebook_path = databricks_notebook.hello_world.path
+    }
+
+    max_retries     = 1
+    timeout_seconds = 3600
+  }
+}
+
+resource "databricks_notebook" "hello_world" {
+  path     = "/Shared/hello_world"
+  language = "PYTHON"
+  content_base64 = base64encode(<<-EOT
+    print("Hello from Databricks job")
+  EOT
+  )
 }

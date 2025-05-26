@@ -22,7 +22,7 @@ output "export_commands" {
   value = join("\n", [
     "export AZURE_RESOURCE_GROUP=${azurerm_resource_group.rg.name}",
     "export DATABRICKS_WORKSPACE=${azurerm_databricks_workspace.databricks.name}",
-    "export DATABRICKS_URL=${azurerm_databricks_workspace.databricks.workspace_url}",
+    "export DATABRICKS_HOST=${azurerm_databricks_workspace.databricks.workspace_url}",
     "export DATABRICKS_CLUSTER_ID=${databricks_cluster.cluster.id}",
     "export DATABRICKS_CLUSTER_NAME=${databricks_cluster.cluster.cluster_name}"
   ])
