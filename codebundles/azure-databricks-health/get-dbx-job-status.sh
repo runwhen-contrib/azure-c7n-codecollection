@@ -48,6 +48,9 @@ jobs_json=$(databricks jobs list --output JSON 2>/dev/null) || {
 
 # Count jobs (directly use the array from the output)
 job_count=$(echo "$jobs_json" | jq 'length')
+echo "DEBUG: jobs_json = $jobs_json"
+echo "DEBUG: job_count = $job_count"
+
 echo "Found $job_count jobs in workspace"
 
 if [ "$job_count" -eq 0 ]; then
@@ -58,6 +61,7 @@ fi
 
 # Process each job
 for j in $(seq 0 $((job_count - 1))); do
+    echo "DEBUG: Starting job loop for job index $j"
     # Initialize counters for each job
     pending_runs=0
     running_runs=0
@@ -83,6 +87,7 @@ for j in $(seq 0 $((job_count - 1))); do
     # Get recent runs for this job using jobs list-runs and capture any error output
     error_file=$(mktemp)
     runs_json=$(databricks jobs list-runs --job-id "$job_id" --limit "$NUM_RECENT_RUNS" --output JSON 2>"$error_file")
+    echo "DEBUG: jobs list-runs exit code: $? for job $job_id"
     if [ $? -ne 0 ]; then
         error_msg=$(cat "$error_file" | tr -d '"' | tr -d '\n')
         echo "⚠️ Failed to retrieve runs for job $job_id: $error_msg"
@@ -109,6 +114,7 @@ for j in $(seq 0 $((job_count - 1))); do
     fi
     rm -f "$error_file"
     
+    echo "DEBUG: runs_json for job $job_id = $runs_json"
     # Check if we got a valid response with runs (either direct array or wrapped in runs object)
     if echo "$runs_json" | jq -e 'if type=="array" then true else .runs? | type=="array" end' > /dev/null 2>&1; then
         # If the response is already an array, use it directly
@@ -138,8 +144,8 @@ for j in $(seq 0 $((job_count - 1))); do
         echo "$job_obj" >> "$TMP_OUTPUT"
         continue
     fi
-    
     run_count=$(echo "$runs_data" | jq 'length')
+    echo "DEBUG: run_count for job $job_id = $run_count"
     
     if [ "$run_count" -eq 0 ]; then
         echo "No runs found for job: $job_name"
@@ -213,33 +219,68 @@ for j in $(seq 0 $((job_count - 1))); do
             duration="N/A"
         fi
         
-        # Get error details if the run failed
+        # Get error details for the run or its tasks
         error_details=""
-        if [ "$result_state" != "SUCCESS" ] && [ "$life_cycle_state" = "TERMINATED" ]; then
-            # Get detailed run information for failed runs
-            error_file=$(mktemp)
-            run_details=$(databricks runs get --run-id "$run_id" --output JSON 2>"$error_file")
-            
-            if [ $? -eq 0 ]; then
-                # Extract error message and stack trace if available
-                error_message=$(echo "$run_details" | jq -r '.state.state_message // ""')
-                error_trace=$(echo "$run_details" | jq -r '.state.user_exception // .state.error // ""')
-                
-                if [ -n "$error_message" ] || [ -n "$error_trace" ]; then
+        error_file=$(mktemp)
+        run_details=$(databricks jobs get-run "$run_id" --output json 2>"$error_file")
+        echo "DEBUG: run_details for run $run_id: $run_details"
+        run_output=$(databricks jobs get-run-output "$run_id" --output JSON 2>/dev/null || echo '{}')
+
+        # Check for tasks array in run_details
+        task_errors="[]"
+        task_count=$(echo "$run_details" | jq '.tasks | length' 2>/dev/null)
+        task_count=${task_count:-0}
+        echo "DEBUG: task_count for run $run_id: $task_count"
+        if [ "$task_count" -gt 0 ]; then
+            for t in $(seq 0 $((task_count - 1))); do
+                task=$(echo "$run_details" | jq ".tasks[$t]")
+                task_key=$(echo "$task" | jq -r '.task_key // ""')
+                task_run_id=$(echo "$task" | jq -r '.run_id // empty')
+                if [ -n "$task_run_id" ]; then
+                    task_output=$(databricks jobs get-run-output "$task_run_id" --output JSON 2>/dev/null || echo '{}')
+                    echo "DEBUG: task_output for $task_key ($task_run_id): $task_output"
+                    task_error=$(echo "$task_output" | jq -r '.error // ""')
+                    task_error_trace=$(echo "$task_output" | jq -r '.error_trace // ""')
+                    echo "DEBUG: task_error for $task_key: $task_error"
+                    echo "DEBUG: task_error_trace for $task_key: $task_error_trace"
+                    task_state_message=$(echo "$task" | jq -r '.state.state_message // ""')
+                    task_status=$(echo "$task" | jq -r '.status.termination_details.code // ""')
+                    task_errors=$(echo "$task_errors" | jq --arg key "$task_key" --arg run_id "$task_run_id" --arg msg "$task_state_message" --arg err "$task_error" --arg trace "$task_error_trace" --arg status "$task_status" '. + [{task_key: $key, run_id: $run_id, state_message: $msg, error: $err, error_trace: $trace, status: $status}]')
+                fi
+            done
+        fi
+
+        # If there are task errors, use them as error_details
+        if [ "$task_errors" != "[]" ]; then
+            # Promote single task error to top-level if only one task
+            if [ "$task_count" -eq 1 ]; then
+                main_task_error=$(echo "$task_errors" | jq -r '.[0].error')
+                main_task_error_trace=$(echo "$task_errors" | jq -r '.[0].error_trace')
+                if [ -n "$main_task_error" ] || [ -n "$main_task_error_trace" ]; then
                     error_details=$(jq -n \
-                        --arg message "$error_message" \
-                        --arg trace "$error_trace" \
-                        '{
-                            error_message: $message,
-                            error_trace: $trace
-                        }' | tr -d '\n')
+                        --arg error "$main_task_error" \
+                        --arg error_trace "$main_task_error_trace" \
+                        '{error: $error, error_trace: $error_trace}' | tr -d '\n')
+                else
+                    error_details=$(jq -n --argjson task_errors "$task_errors" '{task_errors: $task_errors}' | tr -d '\n')
                 fi
             else
-                error_msg=$(cat "$error_file" | tr -d '"' | tr -d '\n')
-                error_details=$(jq -n --arg msg "$error_msg" '{error_fetching_details: $msg}' | tr -d '\n')
+                error_details=$(jq -n --argjson task_errors "$task_errors" '{task_errors: $task_errors}' | tr -d '\n')
             fi
-            rm -f "$error_file"
+        else
+            # Fallback to run-level error extraction
+            error_message=$(echo "$run_details" | jq -r '.state.state_message // ""')
+            error_trace=$(echo "$run_output" | jq -r '.error_trace // ""')
+            error_text=$(echo "$run_output" | jq -r '.error // ""')
+            if [ -n "$error_message" ] || [ -n "$error_trace" ] || [ -n "$error_text" ]; then
+                error_details=$(jq -n \
+                    --arg message "$error_message" \
+                    --arg trace "$error_trace" \
+                    --arg error "$error_text" \
+                    '{error_message: $message, error_trace: $trace, error: $error}' | tr -d '\n')
+            fi
         fi
+        rm -f "$error_file"
         
         # Create run object with error details if available
         run_obj=$(jq -n \
@@ -260,7 +301,6 @@ for j in $(seq 0 $((job_count - 1))); do
                 error_details: $error_details
             }')
         
-        # Add run to array
         runs_array=$(echo "$runs_array" | jq --argjson run "$run_obj" '. + [$run]')
         
         # Determine run status based on life_cycle_state and result_state
@@ -365,8 +405,12 @@ for j in $(seq 0 $((job_count - 1))); do
             runs: $runs
         }')
     
+    echo "DEBUG: About to write job_obj for $job_id to $TMP_OUTPUT"
     echo "$job_obj" >> "$TMP_OUTPUT"
 done
+
+echo "DEBUG: Finished all jobs, check $TMP_OUTPUT"
+cat "$TMP_OUTPUT"
 
 # Combine all job status objects into a single JSON array
 jq -s '.' "$TMP_OUTPUT" > "$TMP_OUTPUT.combined"
@@ -399,14 +443,10 @@ jq --arg max_duration "$MAX_JOB_DURATION_MINUTES" '
       }
     )
   ) | 
-  # Filter out jobs that are completely successful and not long-running
+  # Only keep jobs that have failed or long-running runs
   map(select(
-    # Keep jobs that have any failed runs
     .run_counts.failed > 0 or
-    # Or jobs that have any long-running runs
-    (.runs | any(.is_long_running == true)) or
-    # Or jobs with non-successful states
-    (.status != "OK" and .status != "INFO")
+    (.runs | any(.is_long_running == true))
   ))' "$TMP_OUTPUT.combined" > "$OUTPUT_FILE"
 
 # Clean up temporary files
@@ -436,3 +476,6 @@ else
     echo "[]" > "$OUTPUT_FILE"  # Ensure empty array for no issues
     exit 0
 fi
+
+echo "✅ Output written to $OUTPUT_FILE"
+cat "$OUTPUT_FILE"
