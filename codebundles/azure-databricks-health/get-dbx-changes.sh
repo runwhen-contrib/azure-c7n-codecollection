@@ -31,11 +31,9 @@ TEMP_ALL_CHANGES="temp_all_changes.json"
 echo "[]" > "$TEMP_ALL_CHANGES"
 
 # Get all Databricks workspaces in the resource group
-echo "Retrieving Databricks workspaces in resource group $AZURE_RESOURCE_GROUP..."
-workspaces=$(az databricks workspace list -g "$AZURE_RESOURCE_GROUP" --query "[].id" -o tsv)
+workspaces=$(az databricks workspace list -g "$AZURE_RESOURCE_GROUP" --query "[].id" -o tsv 2>&1) || { echo "$workspaces"; exit 1; }
 
 if [ -z "$workspaces" ]; then
-    echo "No Databricks workspaces found in resource group $AZURE_RESOURCE_GROUP"
     exit 0
 fi
 
@@ -44,14 +42,10 @@ for workspace in $workspaces; do
     workspace_name=$(basename "$workspace")
     echo "Retrieving activity logs for Databricks workspace: $workspace_name..."
     
-    # Get activity logs for the workspace
     activity_logs=$(az monitor activity-log list \
         --resource-id "$workspace" \
         --offset "$TIME_OFFSET" \
-        --output json)
-    echo "$activity_logs"
-    # Check if activity logs retrieval was successful
-    if [ $? -eq 0 ]; then
+        --output json 2>&1) || { echo "$activity_logs"; continue; }
         # Filter important events and add to the changes file
         echo "$activity_logs" | jq --arg name "$workspace_name" '
             . | map(select(
@@ -97,9 +91,8 @@ for workspace in $workspaces; do
         # Add the filtered changes to the temporary all changes file
         jq -s '.[0] + .[1]' "$TEMP_ALL_CHANGES" temp_changes.json > temp_combined.json && mv temp_combined.json "$TEMP_ALL_CHANGES"
         rm temp_changes.json
-    else
-        echo "Failed to retrieve activity logs for $workspace. This might be due to permissions or other API limitations."
-    fi
+    # Skip to next workspace if no activity logs
+    if [ -z "$activity_logs" ]; then continue; fi
 done
 
 # Deduplicate changes based on correlationId, resourceId, and operationValue
