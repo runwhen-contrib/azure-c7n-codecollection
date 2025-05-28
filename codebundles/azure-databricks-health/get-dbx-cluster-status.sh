@@ -20,12 +20,28 @@ echo "🔍 Checking clusters in Databricks workspace using provided host..."
 workspace_name=$(echo "${DATABRICKS_HOST}" | sed -E 's/https:\/\/([^.]+).*/\1/')
 workspace_url=$(echo "${DATABRICKS_HOST}" | sed -E 's/https:\/\///')
 
-clusters_json=$(databricks clusters list --output JSON 2>/dev/null) || {
-    echo "⚠️ Failed to retrieve clusters for workspace"
+if ! clusters_json=$(databricks clusters list --output JSON 2>&1); then
+    echo "$clusters_json"
     exit 1
-}
+fi
 
-cluster_count=$(echo "$clusters_json" | jq '.clusters | length')
+# Debug: Print raw response
+# echo "Raw response: $clusters_json"
+
+# Check if we got a valid JSON response
+if ! echo "$clusters_json" | jq -e . >/dev/null 2>&1; then
+    echo "Error: Invalid JSON response from Databricks API"
+    echo "$clusters_json"
+    exit 1
+fi
+
+# Try to extract cluster count, handling different response formats
+cluster_count=$(echo "$clusters_json" | jq -r 'if type=="array" then length else .clusters? | length end' 2>/dev/null)
+if [ -z "$cluster_count" ] || [ "$cluster_count" = "null" ]; then
+    echo "Error: Unexpected response format from Databricks API"
+    echo "$clusters_json"
+    exit 1
+fi
 
 if [ "$cluster_count" -eq 0 ]; then
     echo "No Databricks clusters found."
@@ -34,10 +50,18 @@ if [ "$cluster_count" -eq 0 ]; then
 fi
 
 for j in $(seq 0 $((cluster_count - 1))); do
-    cluster=$(echo "$clusters_json" | jq ".clusters[$j]")
-    cluster_source=$(echo "$cluster" | jq -r '.cluster_source')
+    # Handle both direct array and clusters.array response formats
+    cluster=$(echo "$clusters_json" | jq -c 'if type=="array" then .['"$j"'] else .clusters?['"$j"'] end' 2>/dev/null)
+    if [ -z "$cluster" ] || [ "$cluster" = "null" ]; then
+        continue
+    fi
+    
+    cluster_source=$(echo "$cluster" | jq -r '.cluster_source // "UNKNOWN"')
 
-    [[ "$cluster_source" != "UI" && "$cluster_source" != "JOB" ]] && continue
+    # Only filter if cluster_source is defined and not empty
+    if [ -n "$cluster_source" ] && [ "$cluster_source" != "UNKNOWN" ] && [ "$cluster_source" != "UI" ] && [ "$cluster_source" != "JOB" ]; then
+        continue
+    fi
 
     CLUSTER_ID=$(echo "$cluster" | jq -r '.cluster_id')
     CLUSTER_NAME=$(echo "$cluster" | jq -r '.cluster_name')
