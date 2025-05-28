@@ -161,6 +161,95 @@ List Databricks Cluster Status in resource group `${AZURE_RESOURCE_GROUP}`
     RW.CLI.Run Cli
     ...    cmd=rm ${status_file}
 
+Check Databricks DBFS I/O Status in resource group `${AZURE_RESOURCE_GROUP}`
+    [Documentation]    Checks the health and performance of DBFS I/O operations for Databricks
+    [Tags]    Databricks    Azure    Health    access:read-only
+    ${output}=    RW.CLI.Run Bash File
+    ...    bash_file=check_dbfs_io.sh
+    ...    env=${env}
+    ...    secret__databricks_host=${DATABRICKS_HOST}
+    ...    secret__databricks_token=${DATABRICKS_TOKEN}
+    ...    timeout_seconds=300
+    ...    include_in_history=false
+    ...    show_in_rwl_cheatsheet=true
+    
+    ${status_data}=    RW.CLI.Run Cli
+    ...    cmd=cat dbfs_io_status.json
+    
+    TRY
+        ${io_status_raw}=    Evaluate    json.loads(r'''${status_data.stdout}''')    json
+        
+        # Check if it's an array or a single object
+        ${is_array}=    Evaluate    isinstance($io_status_raw, list)    builtins
+        
+        # Convert to a standard format (list of tests) for processing
+        ${io_status}=    Create List
+        IF    ${is_array} == True
+            ${io_status}=    Set Variable    ${io_status_raw}
+        ELSE
+            Append To List    ${io_status}    ${io_status_raw}
+        END
+    EXCEPT    AS    ${error}
+        Log    Failed to load JSON payload: ${error}. Defaulting to empty list.    WARN
+        ${io_status}=    Create List
+    END
+    
+    IF    len(${io_status}) > 0
+        # Extract workspace information if available
+        ${workspace_url}=    Set Variable    Unknown
+        TRY
+            ${workspace_url}=    Set Variable    ${io_status[0]['workspace']['workspace_url']}
+        EXCEPT    AS    ${error}
+            Log    Could not extract workspace URL from result: ${error}    WARN
+        END
+        
+        # Format output for report
+        ${io_status_json}=    Evaluate    json.dumps(${io_status})    json
+        ${formatted_io_results}=    RW.CLI.Run Cli
+        ...    cmd=printf '%s' '${io_status_json}' | jq -r '["Test", "Status", "Duration (ms)", "Message"] as \$headers | [\$headers] + [.[] | [.name, .status, .duration_ms, .message]] | .[] | @tsv' | column -t -s $'\t'
+        
+        RW.Core.Add Pre To Report    DBFS I/O Status for ${workspace_url}:\n=====================================================\n${formatted_io_results.stdout}
+        
+        # Process each test result
+        FOR    ${test}    IN    @{io_status}
+            ${test_name}=    Set Variable    ${test}[name]
+            ${test_status}=    Set Variable    ${test}[status]
+            ${test_message}=    Set Variable    ${test}[message]
+            ${duration_ms}=    Set Variable    ${test}[duration_ms]
+            
+            # Handle error details if present
+            ${error_details}=    Set Variable    No detailed error information available
+            ${has_error_details}=    Evaluate    'error_details' in ${test}
+            IF    ${has_error_details}
+                ${error_details}=    Set Variable    ${test}[error_details]
+            END
+            
+            # Raise issues for failed or warning statuses
+            IF    '${test_status}' == 'ERROR' or '${test_status}' == 'WARNING'
+                ${severity}=    Set Variable If    '${test_status}' == 'ERROR'    3    4
+                
+                ${details}=    Set Variable If    '${error_details}' != ''
+                ...    Message: ${test_message}\nDuration: ${duration_ms}ms\nError Details: ${error_details}\nWorkspace: ${workspace_url}
+                ...    Message: ${test_message}\nDuration: ${duration_ms}ms\nWorkspace: ${workspace_url}
+                
+                RW.Core.Add Issue
+                ...    severity=${severity}
+                ...    expected=DBFS I/O operation '${test_name}' should complete successfully
+                ...    actual=DBFS I/O operation '${test_name}' failed with status '${test_status}'
+                ...    title=DBFS I/O Issue: ${test_name} - ${test_status}
+                ...    details=${details}
+                ...    reproduce_hint=${output.cmd}
+                ...    next_steps=Check the Databricks workspace health and network connectivity
+            END
+        END
+    ELSE
+        RW.Core.Add Pre To Report    No DBFS I/O status information available
+    END
+    
+    # Clean up temporary files
+    RW.CLI.Run Cli
+    ...    cmd=rm -f dbfs_io_status.json dbfs_io_check.log tmp_dbfs_io_status.json
+
 *** Keywords ***
 Suite Initialization
     ${azure_credentials}=    RW.Core.Import Secret
