@@ -14,13 +14,27 @@ WARN_LATENCY_MS=2000
 # Output files
 OUTPUT_FILE="dbfs_io_status.json"
 TMP_OUTPUT="tmp_dbfs_io_status.json"
+LOG_FILE="dbfs_io_check.log"
 > "$TMP_OUTPUT"
+> "$LOG_FILE"  # Create empty log file
 
 # Function to log messages with timestamp
 log() {
     local message="[$(date +'%Y-%m-%d %H:%M:%S')] $1"
-    # Only log to stderr to avoid duplicates
+    # Log to stderr and to log file
     echo "$message" >&2
+    echo "$message" >> "$LOG_FILE"
+}
+
+# Function to get workspace information
+get_workspace_info() {
+    log "Getting workspace information..."
+    
+    # Get workspace URL from the host
+    local workspace_url="${DATABRICKS_HOST}"
+    
+    # Return just the workspace URL in a JSON object
+    jq -n --arg url "$workspace_url" '{"workspace_url": $url}'
 }
 
 # Function to check if databricks CLI is installed and authenticated
@@ -30,14 +44,19 @@ check_prerequisites() {
         exit 1
     fi
     
-    # Verify authentication
-    if ! databricks fs ls "dbfs:/" &> /dev/null; then
-        log "ERROR: Not authenticated with Databricks. Please run 'databricks configure --token'"
+    if [ -z "${DATABRICKS_HOST:-}" ] || [ -z "${DATABRICKS_TOKEN:-}" ]; then
+        log "ERROR: DATABRICKS_HOST and DATABRICKS_TOKEN environment variables must be set"
+        exit 1
+    fi
+    
+    # Verify authentication - don't suppress error output
+    if ! databricks fs ls "dbfs:/"; then
+        log "ERROR: Not authenticated with Databricks. Please check your DATABRICKS_TOKEN and DATABRICKS_HOST"
         exit 1
     fi
 }
 
-# Function to measure operation time and capture output
+# Function to measure operation time and capture output with detailed error handling
 measure_operation() {
     local operation_name=$1
     shift
@@ -48,16 +67,31 @@ measure_operation() {
     local status
     
     log "Starting operation: $operation_name"
+    log "Command: $*"
     start_time=$(date +%s%3N)  # milliseconds since epoch
     
-    # Execute the command and capture output and status
+    # Execute the command and capture all output
+    set +e  # Don't exit on error
     output=$("$@" 2>&1)
     status=$?
+    set -e  # Re-enable exit on error
     
     end_time=$(date +%s%3N)
     duration=$((end_time - start_time))
     
-    # Log timing information
+    # Always log the full command and its output for debugging
+    log "Operation: $operation_name"
+    log "Exit status: $status"
+    log "Duration: ${duration}ms"
+    
+    if [ -n "$output" ]; then
+        log "Command output:"
+        echo "$output" | while IFS= read -r line; do
+            log "  $line"
+        done
+    fi
+    
+    # Log timing information and set appropriate exit code
     if [ $status -eq 0 ]; then
         if [ $duration -gt $MAX_LATENCY_MS ]; then
             log "ERROR: $operation_name took ${duration}ms (exceeded SLO of ${MAX_LATENCY_MS}ms)"
@@ -69,47 +103,82 @@ measure_operation() {
             log "SUCCESS: $operation_name completed in ${duration}ms (within SLO of ${MAX_LATENCY_MS}ms)"
         fi
     else
-        log "ERROR: $operation_name failed after ${duration}ms"
-        log "Command output: $output"
+        log "ERROR: $operation_name failed with status $status after ${duration}ms"
+        if [ -n "$output" ]; then
+            log "Error details:"
+            echo "$output" | while IFS= read -r line; do
+                log "  $line"
+            done
+        fi
         EXIT_CODE=1
     fi
     
     # Output the command's stdout for capture by the caller
-    if [ $status -eq 0 ]; then
-        echo -n "$output"
+    if [ $status -eq 0 ] && [ -n "$output" ]; then
+        echo "$output"
     fi
     
     return $status
 }
 
-# Create JSON output for a test result
+# Function to create JSON output for a test result with error details
 create_test_result() {
     local test_name=$1
     local status=$2
     local message=$3
     local duration_ms=${4:-0}
+    local error_details="${5:-}"
     
-    # Create a temporary file for the JSON object
+    # Get workspace info
+    local workspace_info
+    workspace_info=$(get_workspace_info)
+    
+    # Create a temporary file for the JSON output
     local temp_json
     temp_json=$(mktemp)
     
-    # Generate the JSON object with proper escaping
-    jq -n \
-        --arg name "$test_name" \
-        --arg status "$status" \
-        --arg message "$message" \
-        --arg timestamp "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
-        --argjson duration_ms "$duration_ms" \
-        '{
-            name: $name,
-            status: $status,
-            message: $message,
-            timestamp: $timestamp,
-            duration_ms: $duration_ms
-        }' > "$temp_json"
+    # Create the JSON object with error details if available
+    if [ -n "$error_details" ]; then
+        jq -n \
+            --arg name "$test_name" \
+            --arg status "$status" \
+            --arg message "$message" \
+            --arg timestamp "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
+            --argjson duration_ms "$duration_ms" \
+            --argjson workspace "$workspace_info" \
+            --arg error_details "$error_details" \
+            '{
+                name: $name,
+                status: $status,
+                message: $message,
+                timestamp: $timestamp,
+                duration_ms: $duration_ms,
+                workspace: $workspace,
+                error_details: $error_details
+            }' > "$temp_json"
+    else
+        jq -n \
+            --arg name "$test_name" \
+            --arg status "$status" \
+            --arg message "$message" \
+            --arg timestamp "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
+            --argjson duration_ms "$duration_ms" \
+            --argjson workspace "$workspace_info" \
+            '{
+                name: $name,
+                status: $status,
+                message: $message,
+                timestamp: $timestamp,
+                duration_ms: $duration_ms,
+                workspace: $workspace
+            }' > "$temp_json"
+    fi
     
-    # Append to the temporary output file
+    # Append to the output file
     cat "$temp_json" >> "$TMP_OUTPUT"
+    
+    # Add a newline for better readability
+    echo "" >> "$TMP_OUTPUT"
     
     # Clean up
     rm -f "$temp_json"
@@ -124,7 +193,16 @@ main() {
     local duration_ms
     
     log "Starting DBFS I/O Sanity Test"
+    
+    # Initialize temporary output file
+    > "$TMP_OUTPUT"
+    
     check_prerequisites
+    
+    # Get workspace info for logging
+    local workspace_url
+    workspace_url=$(get_workspace_info | jq -r '.workspace_url')
+    log "Workspace URL: $workspace_url"
     
     # Start timing the entire test
     start_time=$(date +%s%3N)
@@ -158,21 +236,34 @@ main() {
         temp_dir=$(mktemp -d)
         temp_read_file="${temp_dir}/healthcheck_read"
         
-        # Run the read operation
+        # Run the read operation - show command output
         log "Downloading test file from DBFS to $temp_read_file"
+        set +e  # Don't exit on error
         read_output=$(measure_operation "DBFS Read" \
             databricks fs cp "dbfs:${TEST_FILE}" "$temp_read_file" 2>&1)
-        local read_status=$?
+        read_status=$?
+        set -e  # Re-enable exit on error
         
-        # Debug output
+        # Always log the operation details
         log "Read operation status: $read_status"
-        log "Read operation output: $read_output"
+        if [ $read_status -ne 0 ]; then
+            log "ERROR: Read operation failed with status $read_status"
+            log "Command output: $read_output"
+        else
+            log "Read operation succeeded"
+            [ -n "$read_output" ] && log "Command output: $read_output"
+        fi
         
         # If read was successful, get the content
         if [ $read_status -eq 0 ]; then
             if [ -f "$temp_read_file" ]; then
-                read_content=$(cat "$temp_read_file" | tr -d '[:space:]')
-                log "Read content: '$read_content'"
+                if ! read_content=$(cat "$temp_read_file" 2>&1); then
+                    log "ERROR: Failed to read temporary file: $read_content"
+                    read_status=1
+                else
+                    read_content=$(echo "$read_content" | tr -d '[:space:]')
+                    log "Read content: '$read_content'"
+                fi
             else
                 log "ERROR: File was not downloaded: $temp_read_file"
                 read_status=1
@@ -212,30 +303,89 @@ main() {
     duration_ms=$((end_time - start_time))
     
     # Final status
-    if [ $EXIT_CODE -eq 0 ]; then
+    local final_status="SUCCESS"
+    local final_message="All operations completed successfully"
+    local error_messages=""
+    
+    # Check for any errors in the execution
+    if [ $EXIT_CODE -ne 0 ]; then
+        final_status="ERROR"
+        final_message="One or more operations failed"
+        # If log file exists and has errors, extract them
+        if [ -f "$LOG_FILE" ] && grep -qi 'ERROR:' "$LOG_FILE" 2>/dev/null; then
+            error_messages=$(grep -i 'ERROR:' "$LOG_FILE" | head -n 5 | sed 's/^[^:]*: //' | tr '\n' '; ')
+        else
+            error_messages="Operation failed with exit code $EXIT_CODE"
+        fi
+        log "❌ DBFS I/O Sanity Test completed with errors in ${duration_ms}ms"
+        log "Error details: $error_messages"
+    else
         log "✅ DBFS I/O Sanity Test completed successfully in ${duration_ms}ms"
-        create_test_result "dbfs_io_sanity" "SUCCESS" "All operations completed within SLO" "$duration_ms"
-    else
-        log "❌ DBFS I/O Sanity Test failed after ${duration_ms}ms"
-        create_test_result "dbfs_io_sanity" "FAILED" "One or more operations failed" "$duration_ms"
     fi
     
-    # Combine all test results into a properly formatted JSON array
+    # Create the final test result
+    create_test_result \
+        "dbfs_io_sanity" \
+        "$final_status" \
+        "$final_message" \
+        $duration_ms \
+        "$error_messages"
+    
+    # Create a direct final JSON output
+    log "Generating JSON output..."
+    
     if [ -s "$TMP_OUTPUT" ]; then
-        # If we have content, format it as a proper JSON array
-        jq -s '.' "$TMP_OUTPUT" > "$OUTPUT_FILE" || {
-            # Fallback if jq fails
-            echo '[' > "$OUTPUT_FILE"
-            # Remove trailing comma if it exists
-            sed -e ':a' -e 'N' -e '$!ba' -e 's/,\n/\n/g' "$TMP_OUTPUT" >> "$OUTPUT_FILE"
-            echo ']' >> "$OUTPUT_FILE"
-        }
+        # Write the final JSON directly
+        cat "$TMP_OUTPUT" > "$OUTPUT_FILE"
+        log "JSON output created successfully"
     else
-        # Empty array if no results
-        echo '[]' > "$OUTPUT_FILE"
+        log "WARNING: No test results were generated in temporary file"
+        # Create a simple JSON result based on exit code
+        if [ $EXIT_CODE -eq 0 ]; then
+            log "Creating success result JSON"
+            # Get workspace info
+            local workspace_info
+            workspace_info=$(get_workspace_info)
+            
+            # Create success JSON
+            jq -n --argjson ws "$workspace_info" \
+                --arg ts "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
+                --arg duration "$duration_ms" \
+                --arg message "$final_message" \
+                '[{
+                    "name": "dbfs_io_sanity",
+                    "status": "SUCCESS",
+                    "message": $message,
+                    "timestamp": $ts,
+                    "duration_ms": ($duration | tonumber),
+                    "workspace": $ws
+                }]' > "$OUTPUT_FILE"
+        else
+            log "Creating error result JSON"
+            # Get workspace info
+            local workspace_info
+            workspace_info=$(get_workspace_info)
+            
+            # Create error JSON with error details
+            jq -n --argjson ws "$workspace_info" \
+                --arg ts "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
+                --arg duration "$duration_ms" \
+                --arg message "$final_message" \
+                --arg error_details "$error_messages" \
+                '[{
+                    "name": "dbfs_io_sanity",
+                    "status": "ERROR",
+                    "message": $message,
+                    "timestamp": $ts,
+                    "duration_ms": ($duration | tonumber),
+                    "workspace": $ws,
+                    "error_details": $error_details
+                }]' > "$OUTPUT_FILE"
+        fi
     fi
     
-    # Clean up temp file
+    # Log completion
+    log "DBFS I/O test completed. Results saved to $OUTPUT_FILE"
     rm -f "$TMP_OUTPUT"
     
     exit $EXIT_CODE
