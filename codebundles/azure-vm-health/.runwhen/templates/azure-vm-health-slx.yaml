@@ -8,7 +8,7 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/azure/compute/10021-icon-service-Virtual-Machine.svg
-  alias: Azure VMs Health in resource group {{ match_resource.resource_group.name }} in azure subscription {{ custom.subscription_name }}
+  alias: Azure VMs Health in resource group {{ match_resource.resource_group.name }} in azure subscription {{ match_resource.subscription_name }}
   asMeasuredBy: Composite health score of resources & activities. 
   configProvided:
   - name: SLX_PLACEHOLDER
