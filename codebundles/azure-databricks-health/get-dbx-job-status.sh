@@ -6,9 +6,28 @@ set -euo pipefail
 OUTPUT_FILE="dbx_job_status.json"
 TMP_OUTPUT="tmp_job_status.jsonl"
 NUM_RECENT_RUNS=${NUM_RECENT_RUNS:-10}  # Default to 10 recent runs per job
+MAX_JOB_DURATION_MINUTES=${MAX_JOB_DURATION_MINUTES:-3}  # Default to 2 hours (120 minutes)
 
-echo "Databricks Host: ${DATABRICKS_HOST}"
-echo "Databricks Token: ${DATABRICKS_TOKEN}"
+# Validate required environment variables
+if [ -z "${DATABRICKS_HOST:-}" ]; then
+    echo "❌ Error: DATABRICKS_HOST environment variable is not set"
+    exit 1
+fi
+
+if [ -z "${DATABRICKS_TOKEN:-}" ]; then
+    echo "❌ Error: DATABRICKS_TOKEN environment variable is not set"
+    exit 1
+fi
+
+# Validate DATABRICKS_HOST format
+if ! echo "${DATABRICKS_HOST}" | grep -qE '^https://[a-zA-Z0-9-]+\.'; then
+    echo "❌ Error: DATABRICKS_HOST must be in format: https://<workspace>.<deployment>.cloud.databricks.com"
+    exit 1
+fi
+
+echo "✅ Validated DATABRICKS_HOST"
+echo "Databricks Host: $(echo "${DATABRICKS_HOST}" | sed 's/\(^https:\/\/[^.]\+\)\.\+$/\1.******/')"
+echo "Databricks Token: ********"  # Don't echo the actual token for security
 
 # Initialize output files
 > "$TMP_OUTPUT"
@@ -47,6 +66,7 @@ for j in $(seq 0 $((job_count - 1))); do
     failed_runs=0
     skipped_runs=0
     other_runs=0
+    long_run=0
     
     job=$(echo "$jobs_json" | jq ".[$j]")
     job_id=$(echo "$job" | jq -r '.job_id')
@@ -251,7 +271,7 @@ for j in $(seq 0 $((job_count - 1))); do
                 ;;
             "RUNNING")
                 echo "🔄 Run $run_id is running"
-                running_runs=$((running_runs + 1))
+                long_run=$((long_run + 1))
                 ;;
             "TERMINATING")
                 echo "🛑 Run $run_id is terminating"
@@ -289,6 +309,11 @@ for j in $(seq 0 $((job_count - 1))); do
     if [ "$failed_runs" -gt 0 ]; then
         status="ERROR"
         message="$failed_runs failed"
+    elif [ "$long_run" -gt 0 ]; then
+        status="WARNING"
+        message="$long_run long-running"
+        # Log long-running job details
+        echo "⏱️  Long-running job detected: $job_name (ID: $job_id)"
     elif [ "$running_runs" -gt 0 ] || [ "$pending_runs" -gt 0 ] || [ "$terminating_runs" -gt 0 ]; then
         status="WARNING"
         message="In progress"
@@ -299,6 +324,9 @@ for j in $(seq 0 $((job_count - 1))); do
     
     # Add detailed status counts
     message+=" (${successful_runs}✅, ${failed_runs}❌, ${running_runs}🔄, ${pending_runs}⏳, ${terminating_runs}🛑, ${skipped_runs}⏭️, ${other_runs}❓)"
+    
+    # Calculate long_runs count
+    long_run_count=$(echo "$runs_array" | jq 'map(select(.is_long_running == true)) | length')
     
     job_obj=$(jq -n \
         --arg workspace "$workspace_name" \
@@ -315,6 +343,7 @@ for j in $(seq 0 $((job_count - 1))); do
         --argjson failed_runs "$failed_runs" \
         --argjson skipped_runs "$skipped_runs" \
         --argjson other_runs "$other_runs" \
+        --argjson long_runs "$long_run_count" \
         '{
             workspace: $workspace,
             workspace_url: $workspace_url,
@@ -330,7 +359,8 @@ for j in $(seq 0 $((job_count - 1))); do
                 successful: $successful_runs,
                 failed: $failed_runs,
                 skipped: $skipped_runs,
-                other: $other_runs
+                other: $other_runs,
+                long_running: $long_runs
             },
             runs: $runs
         }')
@@ -341,24 +371,68 @@ done
 # Combine all job status objects into a single JSON array
 jq -s '.' "$TMP_OUTPUT" > "$TMP_OUTPUT.combined"
 
-# Filter out successful jobs and jobs with no failed runs
-jq '
+# Process the output to add is_long_running flag, update run statuses, and filter out successful jobs
+jq --arg max_duration "$MAX_JOB_DURATION_MINUTES" '
+  def minutes_since(timestamp):
+    if timestamp == "N/A" then 0
+    else (now - (timestamp | strptime("%Y-%m-%d %H:%M:%S") | mktime)) / 60
+    end;
+    
+  def is_long_running(run):
+    if run.life_cycle_state == "RUNNING" and run.start_time != "N/A" and run.end_time == "N/A" then
+      minutes_since(run.start_time) > ($max_duration | tonumber)
+    # Check duration for completed runs
+    elif run.start_time != "N/A" and run.end_time != "N/A" then
+      (run.end_time | strptime("%Y-%m-%d %H:%M:%S") | mktime - (run.start_time | strptime("%Y-%m-%d %H:%M:%S") | mktime)) / 60 > ($max_duration | tonumber)
+    else false
+    end;
+    
+  # Process each job
+  map(
+    . as $job |
+    # Update each run with is_long_running flag and duration
+    .runs |= map(
+      . as $run |
+      $run + {
+        is_long_running: is_long_running($run),
+        max_allowed_minutes: ($max_duration | tonumber)
+      }
+    )
+  ) | 
+  # Filter out jobs that are completely successful and not long-running
   map(select(
-    .status == "ERROR" or 
-    (.run_counts.failed > 0) or
-    (.runs | any(.result_state != "SUCCESS" and .life_cycle_state == "TERMINATED"))
-  ))
-' "$TMP_OUTPUT.combined" > "$OUTPUT_FILE"
+    # Keep jobs that have any failed runs
+    .run_counts.failed > 0 or
+    # Or jobs that have any long-running runs
+    (.runs | any(.is_long_running == true)) or
+    # Or jobs with non-successful states
+    (.status != "OK" and .status != "INFO")
+  ))' "$TMP_OUTPUT.combined" > "$OUTPUT_FILE"
 
 # Clean up temporary files
 rm -f "$TMP_OUTPUT" "$TMP_OUTPUT.combined" "$error_file" 2>/dev/null || true
 
 # Output results
 if [ -s "$OUTPUT_FILE" ] && [ "$(jq 'length' "$OUTPUT_FILE")" -gt 0 ]; then
-    echo "⚠️ Failed job runs detected! Results saved to: $OUTPUT_FILE"
-    exit 1
+    failed_count=$(jq 'map(select(.run_counts.failed > 0)) | length' "$OUTPUT_FILE")
+    long_running_count=$(jq 'map(select(.long_run > 0)) | length' "$OUTPUT_FILE")
+    
+    if [ "$failed_count" -gt 0 ] && [ "$long_running_count" -gt 0 ]; then
+        echo "⚠️  $failed_count jobs with failures and $long_running_count long-running jobs detected! Results saved to: $OUTPUT_FILE"
+    elif [ "$failed_count" -gt 0 ]; then
+        echo "⚠️  $failed_count jobs with failures detected! Results saved to: $OUTPUT_FILE"
+    elif [ "$long_running_count" -gt 0 ]; then
+        echo "⏱️  $long_running_count long-running jobs detected! Results saved to: $OUTPUT_FILE"
+    fi
+    
+    # Set exit code based on severity (failures are more severe than long-running jobs)
+    if [ "$failed_count" -gt 0 ]; then
+        exit 1
+    else
+        exit 0  # Warning exit code for long-running jobs
+    fi
 else
-    echo "✅ No failed job runs detected"
-    echo "[]" > "$OUTPUT_FILE"  # Ensure empty array for no failures
+    echo "✅ No issues detected in job runs"
+    echo "[]" > "$OUTPUT_FILE"  # Ensure empty array for no issues
     exit 0
 fi
