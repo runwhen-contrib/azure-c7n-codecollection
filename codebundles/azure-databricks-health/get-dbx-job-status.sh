@@ -6,26 +6,26 @@ set -euo pipefail
 OUTPUT_FILE="dbx_job_status.json"
 TMP_OUTPUT="tmp_job_status.jsonl"
 NUM_RECENT_RUNS=${NUM_RECENT_RUNS:-10}  # Default to 10 recent runs per job
-MAX_JOB_DURATION_MINUTES=${MAX_JOB_DURATION_MINUTES:-3}  # Default to 2 hours (120 minutes)
+MAX_JOB_DURATION_MINUTES=${MAX_JOB_DURATION_MINUTES:-30}  # Default to 30 minutes
 
 # Validate required environment variables
 if [ -z "${DATABRICKS_HOST:-}" ]; then
-    echo "❌ Error: DATABRICKS_HOST environment variable is not set"
+    echo "Error: DATABRICKS_HOST environment variable is not set"
     exit 1
 fi
 
 if [ -z "${DATABRICKS_TOKEN:-}" ]; then
-    echo "❌ Error: DATABRICKS_TOKEN environment variable is not set"
+    echo "Error: DATABRICKS_TOKEN environment variable is not set"
     exit 1
 fi
 
 # Validate DATABRICKS_HOST format
 if ! echo "${DATABRICKS_HOST}" | grep -qE '^https://[a-zA-Z0-9-]+\.'; then
-    echo "❌ Error: DATABRICKS_HOST must be in format: https://<workspace>.<deployment>.cloud.databricks.com"
+    echo "Error: DATABRICKS_HOST must be in format: https://<workspace>.<deployment>.cloud.databricks.com"
     exit 1
 fi
 
-echo "✅ Validated DATABRICKS_HOST"
+echo "Validated DATABRICKS_HOST"
 echo "Databricks Host: $(echo "${DATABRICKS_HOST}" | sed 's/\(^https:\/\/[^.]\+\)\.\+$/\1.******/')"
 echo "Databricks Token: ********"  # Don't echo the actual token for security
 
@@ -33,16 +33,22 @@ echo "Databricks Token: ********"  # Don't echo the actual token for security
 > "$TMP_OUTPUT"
 echo "[]" > "$OUTPUT_FILE"
 
-# Extract workspace name from the host URL
-workspace_name=$(echo "${DATABRICKS_HOST}" | sed -E 's/https:\/\/([^.]+).*/\1/')
+# Extract workspace name from the host URL or Azure CLI
+workspace_name=""
+if command -v az &> /dev/null && [ -n "${AZURE_RESOURCE_GROUP:-}" ]; then
+    workspace_name=$(az databricks workspace list -g "$AZURE_RESOURCE_GROUP" --query "[?workspaceUrl=='${DATABRICKS_HOST#https://}'].name" -o tsv)
+fi
+if [ -z "$workspace_name" ]; then
+    workspace_name=$(echo "${DATABRICKS_HOST}" | sed -E 's/https:\/\/([^.]+).*/\1/')
+fi
 workspace_url=$(echo "${DATABRICKS_HOST}" | sed -E 's/https:\/\///')
 
-echo "🔍 Checking job runs in Databricks workspace: $workspace_name..."
+echo "Checking job runs in Databricks workspace: $workspace_name..."
 
 # Get all jobs
 echo "Retrieving jobs list..."
 jobs_json=$(databricks jobs list --output JSON 2>/dev/null) || {
-    echo "⚠️ Failed to retrieve jobs for workspace"
+    echo "Failed to retrieve jobs for workspace"
     exit 1
 }
 
@@ -78,7 +84,7 @@ for j in $(seq 0 $((job_count - 1))); do
     
     # Skip if job_name is empty or null
     if [ -z "$job_name" ] || [ "$job_name" = "null" ]; then
-        echo "⚠️ Skipping job with ID $job_id (no name found)"
+        echo "Skipping job with ID $job_id (no name found)"
         continue
     fi
     
@@ -90,7 +96,7 @@ for j in $(seq 0 $((job_count - 1))); do
     echo "DEBUG: jobs list-runs exit code: $? for job $job_id"
     if [ $? -ne 0 ]; then
         error_msg=$(cat "$error_file" | tr -d '"' | tr -d '\n')
-        echo "⚠️ Failed to retrieve runs for job $job_id: $error_msg"
+        echo "Failed to retrieve runs for job $job_id: $error_msg"
         # Add job with error to output
         job_obj=$(jq -n \
             --arg workspace "$workspace_name" \
@@ -125,7 +131,7 @@ for j in $(seq 0 $((job_count - 1))); do
             runs_data=$(echo "$runs_json" | jq -c '.runs // []' 2>/dev/null || echo '[]')
         fi
     else
-        echo "⚠️ Invalid response format for job $job_id runs. Response: $runs_json"
+        echo "Invalid response format for job $job_id runs. Response: $runs_json"
         # Add job with error to output
         job_obj=$(jq -n \
             --arg workspace "$workspace_name" \
@@ -306,36 +312,36 @@ for j in $(seq 0 $((job_count - 1))); do
         # Determine run status based on life_cycle_state and result_state
         case "$life_cycle_state" in
             "PENDING")
-                echo "⏳ Run $run_id is pending"
+                echo "Run $run_id is pending"
                 pending_runs=$((pending_runs + 1))
                 ;;
             "RUNNING")
-                echo "🔄 Run $run_id is running"
+                echo "Run $run_id is running"
                 long_run=$((long_run + 1))
                 ;;
             "TERMINATING")
-                echo "🛑 Run $run_id is terminating"
+                echo "Run $run_id is terminating"
                 terminating_runs=$((terminating_runs + 1))
                 ;;
             "TERMINATED")
                 if [ "$result_state" = "SUCCESS" ]; then
-                    echo "✅ Run $run_id completed successfully"
+                    echo "Run $run_id completed successfully"
                     successful_runs=$((successful_runs + 1))
                 else
                     failed_runs=$((failed_runs + 1))
-                    echo "❌ Run $run_id failed with state: $result_state"
+                    echo "Run $run_id failed with state: $result_state"
                 fi
                 ;;
             "SKIPPED")
-                echo "⏭️  Run $run_id was skipped"
+                echo "Run $run_id was skipped"
                 skipped_runs=$((skipped_runs + 1))
                 ;;
             "INTERNAL_ERROR")
                 failed_runs=$((failed_runs + 1))
-                echo "💥 Run $run_id encountered an internal error"
+                echo "Run $run_id encountered an internal error"
                 ;;
             *)
-                echo "❓ Run $run_id has unknown state: $life_cycle_state"
+                echo "Run $run_id has unknown state: $life_cycle_state"
                 other_runs=$((other_runs + 1))
                 ;;
         esac
@@ -353,7 +359,7 @@ for j in $(seq 0 $((job_count - 1))); do
         status="WARNING"
         message="$long_run long-running"
         # Log long-running job details
-        echo "⏱️  Long-running job detected: $job_name (ID: $job_id)"
+        echo "Long-running job detected: $job_name (ID: $job_id)"
     elif [ "$running_runs" -gt 0 ] || [ "$pending_runs" -gt 0 ] || [ "$terminating_runs" -gt 0 ]; then
         status="WARNING"
         message="In progress"
@@ -363,13 +369,14 @@ for j in $(seq 0 $((job_count - 1))); do
     fi
     
     # Add detailed status counts
-    message+=" (${successful_runs}✅, ${failed_runs}❌, ${running_runs}🔄, ${pending_runs}⏳, ${terminating_runs}🛑, ${skipped_runs}⏭️, ${other_runs}❓)"
+    message+=" (${successful_runs} successful, ${failed_runs} failed, ${running_runs} running, ${pending_runs} pending, ${terminating_runs} terminating, ${skipped_runs} skipped, ${other_runs} other)"
     
     # Calculate long_runs count
     long_run_count=$(echo "$runs_array" | jq 'map(select(.is_long_running == true)) | length')
     
     job_obj=$(jq -n \
         --arg workspace "$workspace_name" \
+        --arg workspace_name "$workspace_name" \
         --arg workspace_url "$workspace_url" \
         --arg job_id "$job_id" \
         --arg job_name "$job_name" \
@@ -386,6 +393,7 @@ for j in $(seq 0 $((job_count - 1))); do
         --argjson long_runs "$long_run_count" \
         '{
             workspace: $workspace,
+            workspace_name: $workspace_name,
             workspace_url: $workspace_url,
             job_id: $job_id,
             job_name: $job_name,
@@ -458,11 +466,11 @@ if [ -s "$OUTPUT_FILE" ] && [ "$(jq 'length' "$OUTPUT_FILE")" -gt 0 ]; then
     long_running_count=$(jq 'map(select(.long_run > 0)) | length' "$OUTPUT_FILE")
     
     if [ "$failed_count" -gt 0 ] && [ "$long_running_count" -gt 0 ]; then
-        echo "⚠️  $failed_count jobs with failures and $long_running_count long-running jobs detected! Results saved to: $OUTPUT_FILE"
+        echo "$failed_count jobs with failures and $long_running_count long-running jobs detected! Results saved to: $OUTPUT_FILE"
     elif [ "$failed_count" -gt 0 ]; then
-        echo "⚠️  $failed_count jobs with failures detected! Results saved to: $OUTPUT_FILE"
+        echo "$failed_count jobs with failures detected! Results saved to: $OUTPUT_FILE"
     elif [ "$long_running_count" -gt 0 ]; then
-        echo "⏱️  $long_running_count long-running jobs detected! Results saved to: $OUTPUT_FILE"
+        echo "$long_running_count long-running jobs detected! Results saved to: $OUTPUT_FILE"
     fi
     
     # Set exit code based on severity (failures are more severe than long-running jobs)
@@ -472,10 +480,10 @@ if [ -s "$OUTPUT_FILE" ] && [ "$(jq 'length' "$OUTPUT_FILE")" -gt 0 ]; then
         exit 0  # Warning exit code for long-running jobs
     fi
 else
-    echo "✅ No issues detected in job runs"
+    echo "No issues detected in job runs"
     echo "[]" > "$OUTPUT_FILE"  # Ensure empty array for no issues
     exit 0
 fi
 
-echo "✅ Output written to $OUTPUT_FILE"
+echo "Output written to $OUTPUT_FILE"
 cat "$OUTPUT_FILE"
