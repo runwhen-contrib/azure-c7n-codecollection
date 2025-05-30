@@ -79,6 +79,9 @@ tasks:
         resource_group=$(terraform show -json terraform.tfstate | jq -r '
           .values.root_module.resources[] | 
           select(.type == "azurerm_resource_group") | .values.name')
+        databricks_host=$(terraform show -json terraform.tfstate | jq -r '
+          .values.root_module.resources[] | 
+          select(.type == "azurerm_databricks_workspace") | .values.host')
         popd > /dev/null
 
         # Check if any of the required cluster variables are empty
@@ -107,6 +110,7 @@ tasks:
           codeBundles: ["$codebundle"]
         custom:
           subscription_name: $subscription_name
+          databricks_host: $DATABRICKS_HOST
         EOF
     silent: true
 
