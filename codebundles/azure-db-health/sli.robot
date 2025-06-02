@@ -40,6 +40,7 @@ Score Database Availability in resource group `${AZURE_RESOURCE_GROUP}`
         
         ${c7n_output}=    RW.CLI.Run Cli
         ...    cmd=custodian run -s azure-c7n-db-health availability.yaml --cache-period 0
+        ...    timeout_seconds=180
         
         ${count}=    RW.CLI.Run Cli
         ...    cmd=cat azure-c7n-db-health/${policy_name}/metadata.json | jq '.metrics[] | select(.MetricName == "ResourceCount") | .Value';
@@ -74,6 +75,7 @@ Count Publicly Accessible Databases in resource group `${AZURE_RESOURCE_GROUP}`
         
         ${c7n_output}=    RW.CLI.Run Cli
         ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-db-health ${CURDIR}/public-access.yaml --cache-period 0
+        ...    timeout_seconds=180
         
         ${count}=    RW.CLI.Run Cli
         ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-db-health/${policy_name}/metadata.json | jq '.metrics[] | select(.MetricName == "ResourceCount") | .Value';
@@ -111,6 +113,7 @@ Count Databases Without Replication in resource group `${AZURE_RESOURCE_GROUP}`
         RW.CLI.Run Cli    cmd=cat ${CURDIR}/replication-check.yaml
         ${c7n_output}=    RW.CLI.Run Cli
         ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-db-health ${CURDIR}/replication-check.yaml --cache-period 0
+        ...    timeout_seconds=180
         
         ${count}=    RW.CLI.Run Cli
         ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-db-health/${policy_name}/metadata.json | jq '.metrics[] | select(.MetricName == "ResourceCount") | .Value';
@@ -148,6 +151,7 @@ Count Databases Without High Availability in resource group `${AZURE_RESOURCE_GR
         
         ${c7n_output}=    RW.CLI.Run Cli
         ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-db-health ${CURDIR}/ha-check.yaml --cache-period 0
+        ...    timeout_seconds=180
         
         ${count}=    RW.CLI.Run Cli
         ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-db-health/${policy_name}/metadata.json | jq '.metrics[] | select(.MetricName == "ResourceCount") | .Value';
@@ -186,6 +190,7 @@ Count Databases With High CPU Usage in resource group `${AZURE_RESOURCE_GROUP}`
         
         ${c7n_output}=    RW.CLI.Run Cli
         ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-db-health ${CURDIR}/high-cpu.yaml --cache-period 0
+        ...    timeout_seconds=180
         
         ${count}=    RW.CLI.Run Cli
         ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-db-health/${policy_name}/metadata.json | jq '.metrics[] | select(.MetricName == "ResourceCount") | .Value';
@@ -224,6 +229,7 @@ Count Databases With High Memory Usage in resource group `${AZURE_RESOURCE_GROUP
         
         ${c7n_output}=    RW.CLI.Run Cli
         ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-db-health ${CURDIR}/high-memory.yaml --cache-period 0
+        ...    timeout_seconds=180
         
         ${count}=    RW.CLI.Run Cli
         ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-db-health/${policy_name}/metadata.json | jq '.metrics[] | select(.MetricName == "ResourceCount") | .Value';
@@ -248,6 +254,7 @@ Count Redis Caches With High Cache Miss Rate in resource group `${AZURE_RESOURCE
     ...    timeframe=${HIGH_CACHE_MISS_TIMEFRAME}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-db-health ${CURDIR}/${policy_name}.yaml --cache-period 0
+    ...    timeout_seconds=180
     ${count}=    RW.CLI.Run Cli
     ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-db-health/${policy_name}/metadata.json | jq '.metrics[] | select(.MetricName == "ResourceCount") | .Value';
     ${high_cache_miss_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_HIGH_CACHE_MISS}) else 0
@@ -262,7 +269,7 @@ Count Databases With Health Issues in resource group `${AZURE_RESOURCE_GROUP}`
     ${script_result}=    RW.CLI.Run Bash File
     ...    bash_file=get-db-health.sh
     ...    env=${env}
-    ...    timeout_seconds=180
+    ...    timeout_seconds=200
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     
