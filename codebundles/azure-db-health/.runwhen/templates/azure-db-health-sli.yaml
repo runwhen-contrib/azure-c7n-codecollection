@@ -30,9 +30,9 @@ spec:
     - name: AZURE_RESOURCE_GROUP
       value: "{{resource_group.name}}"
     - name: AZURE_SUBSCRIPTION_ID
-      value: "{{ subscription_id }}"
+      value: "{{ match_resource.resource.subscription_id }}"
     - name: AZURE_SUBSCRIPTION_NAME
-      value: "{{ subscription_name }}"
+      value: "{{ match_resource.resource.subscription_name }}"
   secretsProvided:
   {% if wb_version %}
     {% include "azure-auth.yaml" ignore missing %}
