@@ -36,9 +36,8 @@ convert_to_portal_url() {
     local resource_id=$1
     # Azure portal base URL
     local base_url="https://portal.azure.com/#@/resource"
-    # URL encode the resource ID
-    local encoded_id=$(printf '%s\n' "$resource_id" | jq -sRr @uri)
-    echo "${base_url}${encoded_id}"
+
+    echo "${base_url}${resource_id}"
 }
 
 # Function to check tags for a single resource group
