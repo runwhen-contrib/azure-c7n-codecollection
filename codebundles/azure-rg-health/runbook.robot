@@ -1,5 +1,5 @@
 *** Settings ***
-Documentation       List unused Azure resource groups (no resources and no activity in the last N days)
+Documentation       Check for unused Azure resource groups and tag compliance
 Metadata            Author    saurabh3460
 Metadata            Display Name    Azure Resource Group Health
 Metadata            Supports    Azure    Resource Group    Health
@@ -11,6 +11,7 @@ Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
 Library    Collections
+Library             OperatingSystem
 
 Suite Setup         Suite Initialization
 
@@ -105,39 +106,26 @@ Check For Azure Resource Tag Compliance
     END
 
     IF    len(@{non_compliant_resources}) > 0
-        # Calculate total non-compliant resources
         ${total_non_compliant}=    Get Length    ${non_compliant_resources}
         
-        # Create formatted summary report
-        ${summary_cmd}=    Set Variable    
-        ...    echo "Resource Group Tag Compliance Summary" && 
-        ...    echo "=============================================" && 
-        ...    echo "Total Resource Groups Checked: ${total_checked}" && 
-        ...    echo "Resource Groups with Issues: $(echo '${report_data.stdout}' | jq -r '[.non_compliant_resources[] | select(.resource_group != null) | .resource_group] | unique | length')" && 
-        ...    echo "Total Non-Compliant Resources: ${total_non_compliant}" && 
-        ...    echo ""
-        
-        ${summary_output}=    RW.CLI.Run Cli    cmd=${summary_cmd}
-        RW.Core.Add Pre To Report    ${summary_output.stdout}
+        # Create formatted summary report using jq
+        # ${summary_cmd}=    Set Variable    
+        # ...    echo '${report_data.stdout}' | jq -r '"Resource Group Tag Compliance Summary\\n=============================================\\n\\nTotal Resource Groups Checked: " + (.total_checked|tostring) + "\\nResource Groups with Issues: " + ([.non_compliant_resources[] | select(.resource_group != null) | .resource_group] | unique | length | tostring)'
+
+        # ${summary_output}=    RW.CLI.Run Cli    cmd=${summary_cmd}
+        # RW.Core.Add Pre To Report    ${summary_output.stdout}
 
         # Create detailed report per resource group
         FOR    ${rg_name}    IN    @{rg_issues.keys()}
             ${rg_resources}=    Get From Dictionary    ${rg_issues}    ${rg_name}
             ${rg_resource_count}=    Get Length    ${rg_resources}
             
-            # Generate formatted table for this resource group using jq for better formatting
-            ${table_cmd}=    Set Variable    
-            ...    echo "Resource Group: ${rg_name}\nNon-Compliant Resources: ${rg_resource_count}\n---" && 
-            ...    printf "%-30s %-20s %-30s %s\\n" "Resource Name" "Resource Type" "Missing Tags" "Portal URL"
+            # Generate table header
+            # RW.Core.Add Pre To Report    Resource Group: ${rg_name}\nNon-Compliant Resources: ${rg_resource_count}\n---\n
             
-            FOR    ${resource}    IN    @{rg_resources}
-                ${resource_name}=    Set Variable    ${resource['resource_name']}
-                ${resource_type}=    Set Variable    ${resource['resource_type']}
-                ${missing_tags}=    Set Variable    ${resource['missing_tags']}
-                ${portal_url}=    Get From Dictionary    ${resource}    portal_url    default=N/A
-                ${missing_tags_str}=    Evaluate    ', '.join(${missing_tags})
-                ${table_cmd}=    Set Variable    ${table_cmd} && printf "%-30s %-20s %-30s %s\\n" "${resource_name}" "${resource_type}" "${missing_tags_str}" "${portal_url}"
-            END
+            # Generate table using jq directly from the resources
+            ${json_str}=    Evaluate    json.dumps({"resources": ${rg_resources}})    json
+            ${table_cmd}=    Set Variable    echo '${json_str}' | jq -r '["Resource Name", "Resource Type", "Missing Tags", "Portal URL"], (.resources[] | [.resource_name, .resource_type, (.missing_tags | join(", ")), .portal_url]) | @tsv' | column -t -s $'\t'
             
             ${table_output}=    RW.CLI.Run Cli    cmd=${table_cmd}
             RW.Core.Add Pre To Report    ${table_output.stdout}\n
@@ -147,30 +135,36 @@ Check For Azure Resource Tag Compliance
             Set To Dictionary    ${rg_details}    resource_group    ${rg_name}
             Set To Dictionary    ${rg_details}    non_compliant_count    ${rg_resource_count}
             Set To Dictionary    ${rg_details}    resources    ${rg_resources}
-            
-            ${missing_tags_summary}=    Create List
+            ${pretty_rg_details}=    Evaluate    pprint.pformat(${rg_details})    modules=pprint
+            # Process missing tags for summary
+            ${all_missing_tags}=    Create List
             FOR    ${resource}    IN    @{rg_resources}
-                ${tags}=    Get From Dictionary    ${resource}    missing_tags
-                FOR    ${tag}    IN    @{tags}
-                    Append To List    ${missing_tags_summary}    ${tag}
+                ${tags}=    Set Variable    ${resource['missing_tags']}
+                # Handle tag list processing
+                ${processed_tags}=    Run Keyword If    len($tags) == 1 and ' ' in $tags[0]
+                ...    Evaluate    $tags[0].split()
+                ...    ELSE    Set Variable    ${tags}
+                
+                FOR    ${tag}    IN    @{processed_tags}
+                    Append To List    ${all_missing_tags}    ${tag}
                 END
             END
-            ${unique_missing_tags}=    Evaluate    list(set(${missing_tags_summary}))
-            ${unique_tags_str}=    Evaluate    ', '.join(${unique_missing_tags})
+            
+            ${unique_missing_tags}=    Evaluate    sorted(list(set($all_missing_tags)))
+            ${unique_tags_str}=    Evaluate    ', '.join(map(str, $unique_missing_tags))
             
             RW.Core.Add Issue
-            ...    severity=2
+            ...    severity=4
             ...    expected=All resources in resource group `${rg_name}` should have required tags: ${unique_tags_str}
             ...    actual=Resource group `${rg_name}` has ${rg_resource_count} resources missing required tags
             ...    title=Tag Compliance Issues in Resource Group `${rg_name}`
             ...    reproduce_hint=${output.cmd}
-            ...    details=${rg_details}
+            ...    details=${pretty_rg_details}
             ...    next_steps=Add missing tags (${unique_tags_str}) to resources in resource group `${rg_name}`. Use the portal URLs in the detailed report to navigate to each resource.
         END
     ELSE
         RW.Core.Add Pre To Report    "All checked resources have required tags - compliance check passed"
     END
-
 
 *** Keywords ***
 Suite Initialization
@@ -200,7 +194,7 @@ Suite Initialization
     ...    pattern=\w*
     ...    default=Name,Environment,Owner
     ...    example=Name,Environment,Owner
-    ${RESOURCE_GROUP}=    RW.Core.Import User Variable    RESOURCE_GROUP
+    ${RESOURCE_GROUPS}=    RW.Core.Import User Variable    RESOURCE_GROUPS
     ...    type=string
     ...    description=Azure resource group to check tag compliance
     ...    pattern=\w*
@@ -209,7 +203,7 @@ Suite Initialization
     Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}    ${AZURE_SUBSCRIPTION_ID}
     Set Suite Variable    ${AZURE_RESOURCE_GROUP}    ${AZURE_RESOURCE_GROUP}
     Set Suite Variable    ${LOOKBACK_DAYS}    ${LOOKBACK_DAYS}
-    Set Suite Variable    ${RESOURCE_GROUP}    ${RESOURCE_GROUP}
+    Set Suite Variable    ${RESOURCE_GROUPS}    ${RESOURCE_GROUPS}
     Set Suite Variable
     ...    ${env}
-    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}", "DAYS":"${LOOKBACK_DAYS}", "RESOURCE_GROUP":"${RESOURCE_GROUP}", "TAGS":"${TAGS}"}
+    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}", "DAYS":"${LOOKBACK_DAYS}", "RESOURCE_GROUPS":"${RESOURCE_GROUPS}", "TAGS":"${TAGS}"}
