@@ -35,7 +35,7 @@ for cmd in jq az; do
 done
 
 # Set default days if not provided
-DAYS=${DAYS:-30}
+DAYS=${COST_DAYS:-30}
 
 # Validate DAYS is a positive integer
 if ! [[ "$DAYS" =~ ^[0-9]+$ ]] || [ "$DAYS" -lt 1 ]; then
