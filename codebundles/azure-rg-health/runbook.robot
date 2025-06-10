@@ -169,7 +169,7 @@ Check For Azure Resource Tag Compliance
 Check Azure Cost Analysis
     [Documentation]    Analyzes Azure consumption and provides cost insights
     [Tags]    Azure    Cost    Analysis    access:read-only
-
+    ${log_file}=    Set Variable    azure_cost_analysis.json
     ${output}=    RW.CLI.Run Bash File
     ...    bash_file=consumption-usage.sh
     ...    env=${env}
@@ -178,7 +178,7 @@ Check Azure Cost Analysis
     ...    show_in_rwl_cheatsheet=true
 
     ${report_data}=    RW.CLI.Run Cli
-    ...    cmd=cat azure_cost_analysis.json
+    ...    cmd=cat ${log_file}
 
     TRY
         ${cost_report}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
@@ -190,52 +190,26 @@ Check Azure Cost Analysis
         Log    Failed to parse cost analysis JSON. Check the script output.    WARN
         RETURN
     END
-
-    # Generate summary report
-    ${summary_cmd}=    Set Variable    
-    ...    echo '${report_data.stdout}' | jq -r '"Azure Cost Analysis Summary\\n=================================\\n\\nDate Range: \\(.metadata.date_range.start) to \\(.metadata.date_range.end) (\\(.metadata.date_range.days) days)\\nTotal Cost: \\(.summary.total_cost) \\(.metadata.billing_currency)\\nEstimated On-Demand Cost: \\(.summary.estimated_on_demand_cost) \\(.metadata.billing_currency)\\nEstimated Savings: \\(.summary.estimated_savings) \\(.metadata.billing_currency) (\\((.summary.estimated_savings / .summary.estimated_on_demand_cost * 100) | round)%%)\\n\\nTop Cost Services:\\n" + ([.cost_breakdown.by_service[] | "• \\(.service): \\(.cost) \\(.metadata.billing_currency) (\\((.cost / .summary.total_cost * 100) | round)%%)"] | join("\\n")) + "\\n\\nCost Summary:\\n• Average Daily Cost: \\(.cost_summary.average_daily_cost) \\(.metadata.billing_currency)\\n• Peak Day: \\(.cost_summary.peak_day.date) (\\(.cost_summary.peak_day.cost) \\(.metadata.billing_currency))\\n• Days with Cost: \\(.cost_summary.total_days_with_cost)/\\(.cost_summary.date_range.total_days)"'
     
-    ${summary_output}=    RW.CLI.Run Cli    cmd=${summary_cmd}
-    RW.Core.Add Pre To Report    ${summary_output.stdout}
+    # 1. Total Cost Summary Report
+    ${total_cost_cmd}=    Set Variable
+    ...    jq -r '"AZURE COST ANALYSIS SUMMARY\n" + ("=" * 50) + "\n" + "Date Range: " + .metadata.date_range.start + " to " + .metadata.date_range.end + " (" + (.metadata.date_range.days | tostring) + " days)\n" + "Total Cost: " + (.summary.total_cost | tostring) + " " + .metadata.billing_currency' ${log_file}
 
-    # Add detailed cost breakdown
-    ${details_cmd}=    Set Variable    
-    ...    echo '${report_data.stdout}' | jq -r '"\\nTop Resources Consumption:\\n" + ([.cost_breakdown.top_resources[] | "• \\(.resource) (\\(.resourceGroup)): \\(.cost) \\(.billingCurrency) (\\(.hours) hours)\\n  Portal: \\(.portal_url)"] | join("\\n"))'
-    
-    ${details_output}=    RW.CLI.Run Cli    cmd=${details_cmd}
-    RW.Core.Add Pre To Report    ${details_output.stdout}
+    ${total_cost_output}=    RW.CLI.Run Cli    cmd=${total_cost_cmd}
+    RW.Core.Add Pre To Report    ${total_cost_output.stdout}
 
-    # Check for cost anomalies
-    ${peak_day_multiplier}=    Evaluate    float(${cost_summary['peak_day']['cost']}) / float(${cost_summary['average_daily_cost']}) if ${cost_summary['average_daily_cost']} > 0 else 1
-    ${peak_day_multiplier_rounded}=    Evaluate    round(${peak_day_multiplier}, 1)
-    ${anomaly_threshold}=    Set Variable    ${2.0}  # 2x daily average is considered an anomaly
+    # 2. Cost Breakdown by Service Report
+    ${breakdown_cmd}=    Set Variable    jq -r 'def total: .summary.total_cost; def currency: .metadata.billing_currency; "\nCOST BREAKDOWN BY SERVICE\n" + ("-" * 50) + "\n" + ([.cost_breakdown.by_service[] | select(.cost > 0) | "• " + .service + ": " + (.cost | tostring) + " " + currency + (if (.cost and total) then " (" + ((.cost / total * 100) | round | tostring) + "%)" else "" end)] | join("\n")) + "\n\nCOST SUMMARY\n" + ("-" * 50) + "\n" + "• Average Daily Cost: " + (.cost_summary.average_daily_cost | tostring) + " " + currency + "\n" + "• Peak Day: " + .cost_summary.peak_day.date + " (" + (.cost_summary.peak_day.cost | tostring) + " " + currency + ")\n" + "• Days with Cost: " + (.cost_summary.total_days_with_cost | tostring) + "/" + (.cost_summary.date_range.total_days | tostring)' ${log_file}
 
-    IF    ${peak_day_multiplier} > ${anomaly_threshold}
-        RW.Core.Add Issue
-        ...    severity=3
-        ...    expected=Daily costs should be relatively stable
-        ...    actual=Peak day cost (${cost_summary['peak_day']['cost']} ${metadata['billing_currency']}) is ${peak_day_multiplier_rounded}x the daily average
-        ...    title=Cost Anomaly Detected on ${cost_summary['peak_day']['date']}
-        ...    reproduce_hint=${output.cmd}
-        ...    details=Peak day: ${cost_summary['peak_day']['date']} (${cost_summary['peak_day']['cost']} ${metadata['billing_currency']})\nAverage daily cost: ${cost_summary['average_daily_cost']} ${metadata['billing_currency']}
-        ...    next_steps=Investigate the spike in costs on ${cost_summary['peak_day']['date']}. Check the top costly resources for unusual activity.
-    END
+    ${breakdown_output}=    RW.CLI.Run Cli    cmd=${breakdown_cmd}
+    RW.Core.Add Pre To Report    ${breakdown_output.stdout}
 
-    # Check for high-cost resources
-    FOR    ${resource}    IN    @{cost_breakdown['top_resources']}
-        ${cost_percentage}=    Evaluate    (float(${resource['cost']}) / float(${summary['total_cost']}) * 100)
-        ${cost_percentage_rounded}=    Evaluate    round(${cost_percentage}, 1)
-        IF    ${cost_percentage} > 20  # Flag resources that account for >20% of total cost
-            RW.Core.Add Issue
-            ...    severity=4
-            ...    expected=No single resource should consume a large portion of the total cost
-            ...    actual=Resource ${resource['resource']} accounts for ${cost_percentage_rounded}% of total costs
-            ...    title=High Cost Resource: ${resource['resource']}
-            ...    reproduce_hint=${output.cmd}
-            ...    details=Cost: ${resource['cost']} ${resource['billingCurrency']} (${cost_percentage_rounded}% of total)\nResource Group: ${resource['resourceGroup']}\nPortal URL: ${resource['portal_url']}
-            ...    next_steps=Review the resource usage and consider optimization or right-sizing. Check if the resource is still needed or if there are more cost-effective alternatives.
-        END
-    END
+    # 3. Top Resources Consumption Report
+    ${resources_cmd}=    Set Variable    jq -r '["Resource", "Resource Group", "Cost", "Hours", "Portal"], (.cost_breakdown.top_resources[] | [.resource, .resourceGroup, (.cost | tostring) + " " + .billingCurrency, (.hours | tostring), .portal_url]) | @tsv' ${log_file} | column -t -s $'\\t'
+
+    ${resources_output}=    RW.CLI.Run Cli    cmd=${resources_cmd}
+    RW.Core.Add Pre To Report    TOP RESOURCES CONSUMPTION\n--------------------------------------------------\n${resources_output.stdout}
+
 
 *** Keywords ***
 Suite Initialization
@@ -271,10 +245,17 @@ Suite Initialization
     ...    pattern=\w*
     ...    default=DefaultResourceGroup-CCAN
     ...    example=rg1,rg2
+    ${COST_DAYS}=    RW.Core.Import User Variable    COST_DAYS
+    ...    type=string
+    ...    description=Number of days to look back for cost analysis.
+    ...    pattern=\d*
+    ...    example=30
+    ...    default=30
     Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}    ${AZURE_SUBSCRIPTION_ID}
     Set Suite Variable    ${AZURE_RESOURCE_GROUP}    ${AZURE_RESOURCE_GROUP}
     Set Suite Variable    ${LOOKBACK_DAYS}    ${LOOKBACK_DAYS}
     Set Suite Variable    ${RESOURCE_GROUPS}    ${RESOURCE_GROUPS}
+    Set Suite Variable    ${COST_DAYS}    ${COST_DAYS}
     Set Suite Variable
     ...    ${env}
-    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}", "DAYS":"${LOOKBACK_DAYS}", "RESOURCE_GROUPS":"${RESOURCE_GROUPS}", "TAGS":"${TAGS}"}
+    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}", "DAYS":"${LOOKBACK_DAYS}", "RESOURCE_GROUPS":"${RESOURCE_GROUPS}", "TAGS":"${TAGS}", "COST_DAYS":"${COST_DAYS}"}
