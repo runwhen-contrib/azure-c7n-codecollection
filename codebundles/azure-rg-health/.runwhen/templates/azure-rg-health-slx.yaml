@@ -17,14 +17,11 @@ spec:
   - {{workspace.owner_email}}
   statement: The health of Azure Resource Groups is measured by identifying unused resource groups (those with no resources and no activity in the specified lookback period).
   additionalContext:
-    name: "{{match_resource.resource.name}}"
+    {% include "azure-hierarchy.yaml" ignore missing %}
     qualified_name: "{{ match_resource.qualified_name }}"
-    resource_group: "{{ match_resource.resource_group.name }}"
-    subscription_id: "{{ match_resource.subscription_id }}"
-  tags:
-    - name: cloud
-      value: azure
-    - name: service
-      value: resource-group
+  tags: 
+    {% include "azure-tags.yaml" ignore missing %}
+    - name: type
+      value: resource_group
     - name: access
       value: read-only
