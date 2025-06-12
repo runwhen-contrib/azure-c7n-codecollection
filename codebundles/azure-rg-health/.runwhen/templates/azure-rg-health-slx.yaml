@@ -8,7 +8,7 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/azure/general/10035-icon-service-Resource-Groups.svg
-  alias: {{ resource_group.name }} Azure Resource Group Health
+  # alias: {{ match_resource_resource.name }} Azure Resource Group Health
   asMeasuredBy: Count of unused resource groups (no resources and no activity)
   configProvided:
   - name: SLX_PLACEHOLDER
