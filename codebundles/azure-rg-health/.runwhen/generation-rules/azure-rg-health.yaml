@@ -12,7 +12,7 @@ spec:
           mode: substring
       slxs:
         - baseName: az-rg-health
-          qualifiers: ["resource","subscription_id"]
+          qualifiers: ["subscription_id"]
           baseTemplateName: azure-rg-health
           levelOfDetail: basic
           outputItems:
