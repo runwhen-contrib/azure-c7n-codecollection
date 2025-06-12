@@ -35,14 +35,14 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/azure/databases/10135-icon-service-Managed-Database.svg
-  alias:  {{ match_resource.resource_group.name }} Azure Database Health
+  alias:  {{ resource_group.name }} Azure Resource Group Health
   asMeasuredBy: Composite health score of resources & activities. 
   configProvided:
   - name: SLX_PLACEHOLDER
     value: SLX_PLACEHOLDER
   owners:
   - {{workspace.owner_email}}
-  statement: The health of Azure databases is measured by evaluating multiple factors like public accessibility, replication status, high availability configuration, CPU utilization, memory usage, and cache performance.
+  statement: The health of Azure resource group.
   additionalContext:
     name: "{{match_resource.resource.name}}"
     qualified_name: "{{ match_resource.qualified_name }}"
@@ -51,7 +51,7 @@ spec:
   tags:
     - name: cloud
       value: azure
-    - name: service
-      value: database
+    - name: type
+      value: resource_group
     - name: access
       value: read-only
