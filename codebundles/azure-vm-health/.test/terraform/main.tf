@@ -105,7 +105,7 @@ resource "azurerm_public_ip" "example_unused" {
   name                = "unused-public-ip"
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
-  allocation_method   = "Static" # You can also use "Dynamic" if preferred
+  allocation_method   = "Static"   # You can also use "Dynamic" if preferred
   sku                 = "Standard" # "Basic" or "Standard"
   tags                = var.tags
 }
