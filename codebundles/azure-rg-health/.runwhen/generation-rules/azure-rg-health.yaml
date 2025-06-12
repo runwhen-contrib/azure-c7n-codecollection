@@ -8,7 +8,7 @@ spec:
       matchRules:
         - type: pattern
           pattern: ".+"
-          properties: []
+          properties: [name]
           mode: substring
       slxs:
         - baseName: az-rg-health
