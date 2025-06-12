@@ -18,5 +18,5 @@ spec:
           outputItems:
             - type: slx
             - type: sli
-            # - type: runbook
-            #   templateName: azure-rg-health-taskset.yaml
+            - type: runbook
+              templateName: azure-rg-health-taskset.yaml
