@@ -7,12 +7,12 @@ spec:
         - azure_resources_resource_groups
       matchRules:
         - type: pattern
-          pattern: ".+"  # Match all resource groups
+          pattern: ".+"
           properties: [name]
           mode: substring
       slxs:
         - baseName: az-rg-health
-          qualifiers: ["resource_group","subscription_id"]
+          qualifiers: ["resource","subscription_id"]
           baseTemplateName: azure-rg-health
           levelOfDetail: basic
           outputItems:
