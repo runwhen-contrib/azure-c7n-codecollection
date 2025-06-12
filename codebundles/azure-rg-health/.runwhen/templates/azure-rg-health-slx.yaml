@@ -14,13 +14,13 @@ spec:
   - name: SLX_PLACEHOLDER
     value: SLX_PLACEHOLDER
   owners:
-  - {{ workspace_owner_email }}
+  # - {{  workspace.owner_email  }}
   statement: The health of Azure Resource Groups is measured by identifying unused resource groups (those with no resources and no activity in the specified lookback period).
   additionalContext:
-    {% include "azure-hierarchy.yaml" ignore missing %}
-    qualified_name: "{{ qualified_name }}"
+    # {% include "azure-hierarchy.yaml" ignore missing %}
+    # qualified_name: "{{ match_resource.qualified_name }}"
   tags: 
-    {% include "azure-tags.yaml" ignore missing %}
+    # {% include "azure-tags.yaml" ignore missing %}
     - name: type
       value: resource_group
     - name: access
