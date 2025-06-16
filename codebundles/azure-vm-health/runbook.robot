@@ -16,7 +16,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Check Azure VM Health in resource group `${AZURE_RESOURCE_GROUP}`
+List VMs Health in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Checks the health status of Azure VMs using the Microsoft.ResourceHealth provider
     [Tags]    VM    Azure    Health    ResourceHealth    access:read-only
 
@@ -102,7 +102,7 @@ List VMs With Public IP in resource group `${AZURE_RESOURCE_GROUP}`
         RW.Core.Add Pre To Report    "No VMs with public IPs found in resource group `${AZURE_RESOURCE_GROUP}`"
     END
 
-List for Stopped VMs in resource group `${AZURE_RESOURCE_GROUP}`
+List Stopped VMs in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Lists VMs that are in a stopped state
     [Tags]    VM    Azure    State    Cost    access:read-only
     CloudCustodian.Core.Generate Policy
@@ -415,6 +415,47 @@ List Unused Public IPs in resource group `${AZURE_RESOURCE_GROUP}`
     ELSE
         RW.Core.Add Pre To Report    "No unused public IPs found in resource group `${AZURE_RESOURCE_GROUP}`"
     END
+
+List VMs Agent Status in resource group `${AZURE_RESOURCE_GROUP}`
+    [Documentation]    Lists VMs that have VM agent status issues
+    [Tags]    VM    Azure    Agent    Health    access:read-only
+    CloudCustodian.Core.Generate Policy
+    ...    vm-agent-status.j2
+    ...    resourceGroup=${AZURE_RESOURCE_GROUP}
+    ${c7n_output}=    RW.CLI.Run Cli
+    ...    cmd=custodian run -s azure-c7n-vm-health vm-agent-status.yaml --cache-period 0
+    ${report_data}=    RW.CLI.Run Cli
+    ...    cmd=cat azure-c7n-vm-health/vm-agent-status/resources.json
+
+    TRY
+        ${vm_list}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
+    EXCEPT
+        Log    Failed to load JSON payload, defaulting to empty list.    WARN
+        ${vm_list}=    Create List
+    END
+
+    IF    len(@{vm_list}) > 0
+        ${formatted_results}=    RW.CLI.Run Cli
+        ...    cmd=jq -r '["VM_Name", "VM_Agent_Status", "Resource_Group", "Location", "VM_Link"], (.[] | [ .name, .vmAgent.statuses[0].code, (.resourceGroup | ascii_downcase), .location, ("https://portal.azure.com/#@/resource" + .id + "/overview") ]) | @tsv' azure-c7n-vm-health/vm-agent-status/resources.json | column -t
+        RW.Core.Add Pre To Report    VMs With VM Agent Status Issues Summary:\n===================================\n${formatted_results.stdout}
+
+        FOR    ${vm}    IN    @{vm_list}
+            ${pretty_vm}=    Evaluate    pprint.pformat(${vm})    modules=pprint
+            ${resource_group}=    Set Variable    ${vm['resourceGroup'].lower()}
+            ${vm_name}=    Set Variable    ${vm['name']}
+            RW.Core.Add Issue
+            ...    severity=3
+            ...    expected=Azure VM `${vm_name}` should have a healthy VM agent status in resource group `${resource_group}`
+            ...    actual=Azure VM `${vm_name}` has VM agent status issues in resource group `${resource_group}`
+            ...    title=VM Agent Status Issues on Azure VM `${vm_name}` found in Resource Group `${resource_group}`
+            ...    reproduce_hint=${c7n_output.cmd}
+            ...    details=${pretty_vm}
+            ...    next_steps=Investigate and fix VM agent issues on the VM in resource group `${AZURE_RESOURCE_GROUP}`
+        END
+    ELSE
+        RW.Core.Add Pre To Report    "No VMs with VM agent status issues found in resource group `${AZURE_RESOURCE_GROUP}`"
+    END
+
 
 
 *** Keywords ***
