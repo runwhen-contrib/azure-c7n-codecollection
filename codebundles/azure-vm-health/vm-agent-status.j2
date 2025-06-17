@@ -3,9 +3,8 @@ policies:
     resource: azure.vm
     filters:
       - type: instance-view
-        key: vmAgent.statuses[].code
-        op: not-in
-        value_type: swap
+        key: vmAgent.statuses[0].code
+        op: eq
         value: ProvisioningState/Unavailable
       - type: value
         key: resourceGroup
