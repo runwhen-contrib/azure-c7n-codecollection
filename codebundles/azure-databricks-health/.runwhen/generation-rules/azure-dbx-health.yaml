@@ -1,0 +1,22 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: azure
+  generationRules:
+    - resourceTypes:
+        - resource_group
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: [provisioningState]
+          mode: substring
+      slxs:
+        - baseName: azure-dbx-health
+          qualifiers: ["resource"]
+          baseTemplateName: azure-dbx-health
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: azure-dbx-health-taskset.yaml
