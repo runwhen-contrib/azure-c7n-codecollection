@@ -34,11 +34,11 @@ Check Azure VM Health in resource group `${AZURE_RESOURCE_GROUP}`
     END
     IF    len(@{health_list}) > 0
         ${healthy_count}=    Evaluate    sum(1 for health in ${health_list} if health['properties']['availabilityState'] == 'Available')    json
-        ${healthy_score}=    Evaluate    1 if int(${healthy_count}) == len(${health_list}) else 0
+        ${health_score}=    Evaluate    1 if int(${healthy_count}) == len(${health_list}) else 0
     ELSE
-        ${healthy_score}=    Set Variable    0
+        ${health_score}=    Set Variable    0
     END
-    Set Global Variable    ${healthy_score}
+    Set Global Variable    ${health_score}
 
 Check for VMs With Public IP in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Lists VMs with public IP address
@@ -154,8 +154,22 @@ Check for Unused Public IPs in resource group `${AZURE_RESOURCE_GROUP}`
     ${unused_public_ip_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_UNUSED_PUBLIC_IP}) else 0
     Set Global Variable    ${unused_public_ip_score}
 
+Check VMs Agent Status in resource group `${AZURE_RESOURCE_GROUP}`
+    [Documentation]    Lists VMs that have VM agent status issues
+    [Tags]    VM    Azure    Agent    Health    access:read-only
+    CloudCustodian.Core.Generate Policy
+    ...    vm-agent-status.j2
+    ...    resourceGroup=${AZURE_RESOURCE_GROUP}
+    ${c7n_output}=    RW.CLI.Run Cli
+    ...    cmd=custodian run -s azure-c7n-vm-health vm-agent-status.yaml --cache-period 0
+    ${count}=    RW.CLI.Run Cli
+    ...    cmd=cat azure-c7n-vm-health/vm-agent-status/metadata.json | jq '.metrics[] | select(.MetricName == "ResourceCount") | .Value';
+    ${vm_agent_status_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_VM_AGENT_STATUS}) else 0
+    Set Global Variable    ${vm_agent_status_score}
+
+
 Generate Health Score
-    ${health_score}=    Evaluate  (${vm_with_public_ip_score} + ${cpu_usage_score} + ${stopped_vm_score} + ${underutilized_vm_score} + ${high_memory_score} + ${underutilized_memory_score} + ${unused_nic_score} + ${unused_public_ip_score} + ${healthy_score}) / 9
+    ${health_score}=    Evaluate  (${vm_with_public_ip_score} + ${cpu_usage_score} + ${stopped_vm_score} + ${underutilized_vm_score} + ${high_memory_score} + ${underutilized_memory_score} + ${unused_nic_score} + ${unused_public_ip_score} + ${health_score} + ${vm_agent_status_score}) / 10
     ${health_score}=    Convert to Number    ${health_score}  2
     RW.Core.Push Metric    ${health_score}
 
@@ -278,6 +292,12 @@ Suite Initialization
     ...    pattern=^\d+$
     ...    example=1
     ...    default=0
+    ${MAX_VM_AGENT_STATUS}=    RW.Core.Import User Variable    MAX_VM_AGENT_STATUS
+    ...    type=string
+    ...    description=The maximum number of VMs with agent status issues to allow.
+    ...    pattern=^\d+$
+    ...    example=1
+    ...    default=0
     Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}    ${AZURE_SUBSCRIPTION_ID}
     Set Suite Variable    ${AZURE_RESOURCE_GROUP}    ${AZURE_RESOURCE_GROUP}
     Set Suite Variable    ${HIGH_CPU_PERCENTAGE}    ${HIGH_CPU_PERCENTAGE}
@@ -295,7 +315,8 @@ Suite Initialization
     Set Suite Variable    ${LOW_MEMORY_TIMEFRAME}    ${LOW_MEMORY_TIMEFRAME}
     Set Suite Variable    ${MAX_UNDERUTILIZED_VM_MEMORY}    ${MAX_UNDERUTILIZED_VM_MEMORY}
     Set Suite Variable    ${MAX_UNUSED_NIC}    ${MAX_UNUSED_NIC}
-    set Suite Variable    ${MAX_UNUSED_PUBLIC_IP}    ${MAX_UNUSED_PUBLIC_IP}
+    Set Suite Variable    ${MAX_UNUSED_PUBLIC_IP}    ${MAX_UNUSED_PUBLIC_IP}
+    Set Suite Variable    ${MAX_VM_AGENT_STATUS}    ${MAX_VM_AGENT_STATUS}
     Set Suite Variable
     ...    ${env}
     ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}"}
