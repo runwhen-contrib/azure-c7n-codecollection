@@ -134,14 +134,14 @@ resource "azurerm_linux_virtual_machine" "vm-no-agent" {
   name                = "test-vm-no-agent"
   resource_group_name = azurerm_resource_group.rg.name
   location            = azurerm_resource_group.rg.location
-  size                = "Standard_B1s"
+  size                = "Standard_DS1_v2"
   admin_username      = "adminuser"
   
   # Disable VM agent
   disable_password_authentication = true
   admin_ssh_key {
     username   = "adminuser"
-    public_key = file("~/.ssh/id_rsa.pub")
+    public_key = tls_private_key.ssh_key.public_key_openssh
   }
 
   network_interface_ids = [
@@ -172,7 +172,8 @@ resource "azurerm_linux_virtual_machine" "vm-no-agent" {
   # Disable VM agent
   custom_data = base64encode(<<-EOF
     #!/bin/bash
-    systemctl stop waagent
+    apt-get update
+    apt-get remove -y walinuxagent
     systemctl disable waagent
   EOF
   )
