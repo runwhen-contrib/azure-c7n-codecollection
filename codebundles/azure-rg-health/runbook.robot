@@ -1,5 +1,5 @@
 *** Settings ***
-Documentation       Check for unused Azure resource groups and tag compliance
+Documentation       Check for unused Azure resource groups, tag compliance and consumption usage
 Metadata            Author    saurabh3460
 Metadata            Display Name    Azure Resource Group Health
 Metadata            Supports    Azure    Resource Group    Health
