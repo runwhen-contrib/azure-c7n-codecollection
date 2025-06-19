@@ -52,7 +52,7 @@ Check For Unused Azure Resource Groups
             ${details}=      Evaluate    pprint.pformat(${rg})    modules=pprint
             
             RW.Core.Add Issue
-            ...    severity=3
+            ...    severity=4
             ...    expected=Resource group `${name}` should have resources or activity
             ...    actual=Resource group `${name}` is unused
             ...    title=Unused Azure Resource Group `${name}` Found
