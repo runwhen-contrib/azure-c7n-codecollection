@@ -4,7 +4,7 @@ spec:
   platform: azure
   generationRules:
     - resourceTypes:
-        - azure_resources_resource_groups
+        - resource_group
       matchRules:
         - type: pattern
           pattern: ".+"  # Match all resource groups
@@ -12,7 +12,7 @@ spec:
           mode: substring
       slxs:
         - baseName: az-rg-health
-          qualifiers: ["resource","subscription_id"]
+          qualifiers: ["subscription_id"]
           baseTemplateName: azure-rg-health
           levelOfDetail: basic
           outputItems:

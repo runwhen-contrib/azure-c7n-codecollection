@@ -8,7 +8,7 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/azure/general/10035-icon-service-Resource-Groups.svg
-  alias: {{ match_resource.resource_group.name }} Azure Resource Group Health
+  alias: {{ resource_group.name }} Azure Resource Group Health
   asMeasuredBy: Count of unused resource groups (no resources and no activity)
   configProvided:
   - name: SLX_PLACEHOLDER
@@ -16,15 +16,11 @@ spec:
   owners:
   - {{workspace.owner_email}}
   statement: The health of Azure Resource Groups is measured by identifying unused resource groups (those with no resources and no activity in the specified lookback period).
-  additionalContext:
-    name: "{{match_resource.resource.name}}"
-    qualified_name: "{{ match_resource.qualified_name }}"
-    resource_group: "{{ match_resource.resource_group.name }}"
-    subscription_id: "{{ match_resource.subscription_id }}"
+  additionalContext: []
   tags:
     - name: cloud
       value: azure
-    - name: service
-      value: resource-group
+    - name: type
+      value: resource_group
     - name: access
       value: read-only
