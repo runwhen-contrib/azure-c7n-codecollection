@@ -11,7 +11,7 @@ spec:
   displayUnitsShort: ok
   locations:
     - {{default_location}}
-  description: Monitor unused Azure Resource Groups (no resources and no activity in the last N days)
+  description: Monitor unused Azure Resource Groups and tag compliance
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
