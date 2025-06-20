@@ -34,11 +34,11 @@ Check Azure VM Health in resource group `${AZURE_RESOURCE_GROUP}`
     END
     IF    len(@{health_list}) > 0
         ${healthy_count}=    Evaluate    sum(1 for health in ${health_list} if health['properties']['availabilityState'] == 'Available')    json
-        ${health_score}=    Evaluate    1 if int(${healthy_count}) == len(${health_list}) else 0
+        ${vm_health_score}=    Evaluate    1 if int(${healthy_count}) == len(${health_list}) else 0
     ELSE
-        ${health_score}=    Set Variable    0
+        ${vm_health_score}=    Set Variable    0
     END
-    Set Global Variable    ${health_score}
+    Set Global Variable    ${vm_health_score}
 
 Check for VMs With Public IP in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Lists VMs with public IP address
@@ -275,7 +275,7 @@ Check VMs Agent Status in resource group `${AZURE_RESOURCE_GROUP}`
 
 
 Generate Health Score
-    ${health_score}=    Evaluate  (${vm_with_public_ip_score} + ${cpu_usage_score} + ${stopped_vm_score} + ${underutilized_vm_score} + ${high_memory_score} + ${underutilized_memory_score} + ${unused_nic_score} + ${unused_public_ip_score} + ${health_score} + ${vm_agent_status_score}) / 10
+    ${health_score}=    Evaluate  (${vm_with_public_ip_score} + ${cpu_usage_score} + ${stopped_vm_score} + ${underutilized_vm_score} + ${high_memory_score} + ${underutilized_memory_score} + ${unused_nic_score} + ${unused_public_ip_score} + ${vm_health_score} + ${vm_agent_status_score}) / 10
     ${health_score}=    Convert to Number    ${health_score}  2
     RW.Core.Push Metric    ${health_score}
 
