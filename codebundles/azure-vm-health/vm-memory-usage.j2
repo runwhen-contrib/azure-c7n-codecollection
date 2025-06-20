@@ -7,6 +7,11 @@ policies:
         op: not-in
         value_type: swap
         value: PowerState/deallocated
+      - type: instance-view
+        key: statuses[].code
+        op: not-in
+        value_type: swap
+        value: ProvisioningState/Unavailable
       - type: metric
         metric: Available Memory Percentage
         op: {{op}} 

@@ -9,7 +9,7 @@ policies:
         value: PowerState/deallocated
       - type: metric
         metric: Percentage CPU
-        op: ge
+        op: gt
         aggregation: average
         threshold: {{cpu_percentage}}
         timeframe: {{timeframe}}

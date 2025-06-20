@@ -1,0 +1,12 @@
+policies:
+  - name: vm-agent-status
+    resource: azure.vm
+    filters:
+      - type: instance-view
+        key: vmAgent.statuses[0].code
+        op: eq
+        value: ProvisioningState/Unavailable
+      - type: value
+        key: resourceGroup
+        op: eq
+        value: {{resourceGroup|upper}}

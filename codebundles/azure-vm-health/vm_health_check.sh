@@ -42,45 +42,41 @@ else
     echo "Microsoft.ResourceHealth provider is already registered."
 fi
 
-# Check required environment variables
-if [ -z "$AZURE_RESOURCE_GROUP" ]; then
-    echo "Error: AZURE_RESOURCE_GROUP environment variable must be set."
-    exit 1
-fi
-
 # Define provider path for virtual machines
 provider_path="Microsoft.Compute/virtualMachines"
 display_name="Azure Virtual Machine"
 
 echo "Processing resource type: virtual-machine ($display_name)"
 
-# Get list of VMs in the resource group
-instances=$(az vm list -g "$AZURE_RESOURCE_GROUP" --query "[].name" -o tsv)
+# Get list of all VMs across all resource groups
+instances=$(az vm list --query "[].{name:name, resourceGroup:resourceGroup}" -o tsv | sort -u)
 
 # Check if any VMs were found
 if [ -z "$instances" ]; then
-    echo "No virtual machines found in resource group $AZURE_RESOURCE_GROUP"
+    echo "No virtual machines found in the subscription."
     exit 0
 fi
 
 # Process each VM
-for instance in $instances; do
-    echo "Retrieving health status for $display_name: $instance..."
+echo "Found $(echo "$instances" | wc -l) virtual machines to process..."
+
+echo "$instances" | while read -r vm_name resource_group; do
+    echo "Retrieving health status for $display_name: $vm_name in resource group $resource_group..."
     
     # Get health status for current VM
     health_status=$(az rest --method get \
-        --url "https://management.azure.com/subscriptions/$subscription/resourceGroups/$AZURE_RESOURCE_GROUP/providers/$provider_path/$instance/providers/Microsoft.ResourceHealth/availabilityStatuses/current?api-version=2023-07-01-preview" \
+        --url "https://management.azure.com/subscriptions/$subscription/resourceGroups/$resource_group/providers/$provider_path/$vm_name/providers/Microsoft.ResourceHealth/availabilityStatuses/current?api-version=2023-07-01-preview" \
         -o json 2>/dev/null)
     
     # Check if health status retrieval was successful
     if [ $? -eq 0 ]; then
-        # Add resource type and name to the health status
-        health_status=$(echo "$health_status" | jq --arg type "virtual-machine" --arg name "$instance" --arg display "$display_name" '. + {resourceType: $type, resourceName: $name, displayName: $display}')
+        # Add resource type, name, and resource group to the health status
+        health_status=$(echo "$health_status" | jq --arg type "virtual-machine" --arg name "$vm_name" --arg rg "$resource_group" --arg display "$display_name" '. + {resourceType: $type, resourceName: $name, resourceGroup: $rg, displayName: $display}')
         
         # Add the health status to the array in the JSON file
         jq --argjson health "$health_status" '. += [$health]' "$HEALTH_OUTPUT" > temp.json && mv temp.json "$HEALTH_OUTPUT"
     else
-        echo "Failed to retrieve health status for $instance ($provider_path/$instance). This might be due to unsupported resource type or other API limitations."
+        echo "Failed to retrieve health status for $vm_name in resource group $resource_group. This might be due to unsupported resource type or other API limitations."
     fi
 done
 
