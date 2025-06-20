@@ -314,7 +314,7 @@ List VMs With High Memory Usage in resource group `${AZURE_RESOURCE_GROUP}`
             # Check if metrics are available
             ${metrics_available}=    RW.CLI.Run Cli
             ...    cmd=echo '${json_str}' | jq -r '(."c7n:metrics" | to_entries | map(.value.measurement[0]) | first) != null'
-            
+            ${metrics_available_clean}=    Strip String    ${metrics_available.stdout}
             IF    "${metrics_available.stdout}" == "true"
                 ${formatted_results}=    RW.CLI.Run Cli
                 ...    cmd=jq -r '["VM_Name", "Resource_Group", "Location", "Available_Memory%", "VM_Status", "VM_Link"], (.[] | [ .name, (.resourceGroup | ascii_downcase), .location, (."c7n:metrics" | to_entries | map(.value.measurement[0]) | first // "N/A" | tonumber | (. * 100 | round / 100) | tostring), (.instanceView.statuses[0].code // "Unknown"), ("https://portal.azure.com/#@/resource" + .id + "/overview") ]) | @tsv' ${OUTPUT_DIR}/azure-c7n-vm-health/vm-memory-usage/resources.json | column -t
