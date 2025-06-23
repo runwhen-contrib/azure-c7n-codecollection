@@ -76,22 +76,24 @@ Count Unused Storage Accounts in resource group `${AZURE_RESOURCE_GROUP}`
     Set Global Variable    ${unused_storage_account_score}
 
 
-Count Public Accessible Storage Accounts in resource group `${AZURE_RESOURCE_GROUP}`
-    [Documentation]    Count storage accounts with public access enabled
+Count Storage Containers with Public Access in resource group `${AZURE_RESOURCE_GROUP}`
+    [Documentation]    Count storage containers with public access enabled
     [Tags]    Storage    Azure    Security    access:read-only
     CloudCustodian.Core.Generate Policy   
-    ...    ${CURDIR}/storage-accounts-with-public-access.j2
+    ...    stg-containers-with-public-access.j2
     ...    resourceGroup=${AZURE_RESOURCE_GROUP}
     ${c7n_output}=    RW.CLI.Run Cli
-    ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-storage-public-access ${CURDIR}/storage-accounts-with-public-access.yaml --cache-period 0
+    ...    cmd=custodian run -s azure-c7n-storage-containers-public-access stg-containers-with-public-access.yaml --cache-period 0
+    RW.CLI.Run Cli
+    ...    cmd=ls -la azure-c7n-storage-containers-public-access/storage-container-public
     ${count}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-storage-public-access/storage-accounts-with-public-access/metadata.json | jq '.metrics[] | select(.MetricName == "ResourceCount") | .Value';
-    ${public_access_sa_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_PUBLIC_ACCESS_STORAGE_ACCOUNT}) else 0
-    Set Global Variable    ${public_access_sa_score}
+    ...    cmd=cat azure-c7n-storage-containers-public-access/storage-container-public/metadata.json | jq '.metrics[] | select(.MetricName == "ResourceCount") | .Value';
+    ${public_access_container_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_PUBLIC_ACCESS_STORAGE_ACCOUNT}) else 0
+    Set Global Variable    ${public_access_container_score}
 
 
 Generate Health Score
-    ${health_score}=    Evaluate  (${unused_snapshot_score} + ${unused_disk_score} + ${unused_storage_account_score} + ${public_access_sa_score} + ${available_storage_score}) / 5
+    ${health_score}=    Evaluate  (${unused_snapshot_score} + ${unused_disk_score} + ${unused_storage_account_score} + ${public_access_container_score} + ${available_storage_score}) / 5
     ${health_score}=    Convert to Number    ${health_score}  2
     RW.Core.Push Metric    ${health_score}
 
