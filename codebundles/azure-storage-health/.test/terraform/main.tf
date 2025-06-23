@@ -38,3 +38,9 @@ resource "azurerm_storage_account" "example" {
   account_replication_type = "LRS"
   tags                     = var.tags
 }
+
+resource "azurerm_storage_container" "public_container" {
+  name                  = "public-container"
+  storage_account_id    = azurerm_storage_account.example.id
+  container_access_type = "blob" # Public read access for blobs only
+}
