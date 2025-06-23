@@ -184,45 +184,6 @@ List Unused Azure Storage Accounts in resource group `${AZURE_RESOURCE_GROUP}`
         RW.Core.Add Pre To Report    "No unused storage accounts found in resource group `${AZURE_RESOURCE_GROUP}`"
     END
 
-List Public Accessible Azure Storage Accounts in resource group `${AZURE_RESOURCE_GROUP}`
-    [Documentation]    List Azure storage accounts with public access enabled
-    [Tags]    Storage    Azure    Security    access:read-only
-    CloudCustodian.Core.Generate Policy   
-    ...    ${CURDIR}/storage-accounts-with-public-access.j2
-    ...    resourceGroup=${AZURE_RESOURCE_GROUP}
-    ${c7n_output}=    RW.CLI.Run Cli
-    ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-storage-public-access ${CURDIR}/storage-accounts-with-public-access.yaml --cache-period 0
-    ${report_data}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-storage-public-access/storage-accounts-with-public-access/resources.json
-
-    TRY
-        ${storage_list}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
-    EXCEPT
-        Log    Failed to load JSON payload, defaulting to empty list.    WARN
-        ${storage_list}=    Create List
-    END
-
-    IF    len(@{storage_list}) > 0
-        ${formatted_results}=    RW.CLI.Run Cli
-        ...    cmd=jq -r '["Storage_Name", "Resource_Group", "Location", "Public_Access", "Storage_Link"], (.[] | [ .name, (.resourceGroup | ascii_downcase), .location, (.properties.networkAcls.defaultAction), ("https://portal.azure.com/#@/resource" + .id + "/overview") ]) | @tsv' ${OUTPUT_DIR}/azure-c7n-storage-public-access/storage-accounts-with-public-access/resources.json | column -t
-        RW.Core.Add Pre To Report    Public Accessible Storage Accounts Summary:\n========================\n${formatted_results.stdout}
-
-        FOR    ${storage}    IN    @{storage_list}
-            ${pretty_storage}=    Evaluate    pprint.pformat(${storage})    modules=pprint
-            ${resource_group}=    Set Variable    ${storage['resourceGroup'].lower()}
-            ${storage_name}=    Set Variable    ${storage['name']}
-            RW.Core.Add Issue
-            ...    severity=4
-            ...    expected=Azure storage account `${storage_name}` should have restricted public access in resource group `${resource_group}` 
-            ...    actual=Azure storage account `${storage_name}` has public access enabled in resource group `${resource_group}` 
-            ...    title=Public Accessible Azure Storage Account `${storage_name}` found in Resource Group `${resource_group}` 
-            ...    reproduce_hint=${c7n_output.cmd}
-            ...    details=${pretty_storage}
-            ...    next_steps=Restrict public access to the storage account to improve security in resource group `${resource_group}`
-        END
-    ELSE
-        RW.Core.Add Pre To Report    "No public accessible storage accounts found in resource group `${AZURE_RESOURCE_GROUP}`"
-    END
 
 
 List Storage Containers with Public Access in resource group `${AZURE_RESOURCE_GROUP}`
@@ -232,10 +193,9 @@ List Storage Containers with Public Access in resource group `${AZURE_RESOURCE_G
     ...    stg-containers-with-public-access.j2
     ...    resourceGroup=${AZURE_RESOURCE_GROUP}
     ${c7n_output}=    RW.CLI.Run Cli
-    ...    cmd=custodian run -s azure-c7n-storage-containers-public-access stg-containers-with-public-access.yaml --cache-period 0
+    ...    cmd=custodian run -s storage-container-public stg-containers-with-public-access.yaml --cache-period 0
     ${report_data}=    RW.CLI.Run Cli
-    ...    cmd=cat azure-c7n-storage-containers-public-access/stg-containers-with-public-access/resources.json
-
+    ...    cmd=cat azure-c7n-storage-containers-public-access/storage-container-public/resources.json
     TRY
         ${container_list}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
     EXCEPT
@@ -245,7 +205,7 @@ List Storage Containers with Public Access in resource group `${AZURE_RESOURCE_G
 
     IF    len(@{container_list}) > 0
         ${formatted_results}=    RW.CLI.Run Cli
-        ...    cmd=jq -r '["Container_Name", "Resource_Group", "Location", "Public_Access_Level", "Container_Link"], (.[] | [ .name, (.resourceGroup | ascii_downcase), .location, (.properties.publicAccess), ("https://portal.azure.com/#@/resource" + .id + "/overview") ]) | @tsv' ${OUTPUT_DIR}/azure-c7n-storage-containers-public-access/stg-containers-with-public-access/resources.json | column -t
+        ...    cmd=jq -r '["Container_Name","Storage_Account","Resource_Group","Public_Access_Level","Container_Link"], (.[] | [ .name,(.id | split("/") | .[8] // ""), (.resourceGroup | ascii_downcase), (.properties.publicAccess), ("https://portal.azure.com/#@/resource" + .id + "/overview") ]) | @tsv' azure-c7n-storage-containers-public-access/storage-container-public/resources.json | column -s $'\t' -t 
         RW.Core.Add Pre To Report    Public Accessible Storage Containers Summary:\n========================\n${formatted_results.stdout}
 
         FOR    ${container}    IN    @{container_list}
@@ -259,7 +219,7 @@ List Storage Containers with Public Access in resource group `${AZURE_RESOURCE_G
             ...    Unknown public access level
             
             RW.Core.Add Issue
-            ...    severity=4
+            ...    severity=3
             ...    expected=Azure storage container `${container_name}` should have restricted public access (None) in resource group `${resource_group}`
             ...    actual=Azure storage container `${container_name}` has public access level '${public_access}' (${access_description}) in resource group `${resource_group}`
             ...    title=Public Accessible Azure Storage Container `${container_name}` found in Resource Group `${resource_group}`
