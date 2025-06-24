@@ -193,7 +193,7 @@ List Storage Containers with Public Access in resource group `${AZURE_RESOURCE_G
     ...    stg-containers-with-public-access.j2
     ...    resourceGroup=${AZURE_RESOURCE_GROUP}
     ${c7n_output}=    RW.CLI.Run Cli
-    ...    cmd=custodian run -s storage-container-public stg-containers-with-public-access.yaml --cache-period 0
+    ...    cmd=custodian run -s azure-c7n-storage-containers-public-access stg-containers-with-public-access.yaml --cache-period 0
     ${report_data}=    RW.CLI.Run Cli
     ...    cmd=cat azure-c7n-storage-containers-public-access/storage-container-public/resources.json
     TRY
