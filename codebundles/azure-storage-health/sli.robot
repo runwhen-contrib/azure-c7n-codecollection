@@ -84,8 +84,6 @@ Count Storage Containers with Public Access in resource group `${AZURE_RESOURCE_
     ...    resourceGroup=${AZURE_RESOURCE_GROUP}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s azure-c7n-storage-containers-public-access stg-containers-with-public-access.yaml --cache-period 0
-    RW.CLI.Run Cli
-    ...    cmd=ls -la azure-c7n-storage-containers-public-access/storage-container-public
     ${count}=    RW.CLI.Run Cli
     ...    cmd=cat azure-c7n-storage-containers-public-access/storage-container-public/metadata.json | jq '.metrics[] | select(.MetricName == "ResourceCount") | .Value';
     ${public_access_container_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_PUBLIC_ACCESS_STORAGE_ACCOUNT}) else 0
