@@ -53,8 +53,8 @@ Check Azure Storage Resource Health in resource group `${AZURE_RESOURCE_GROUP}`
     ELSE
         RW.Core.Add Issue
         ...    severity=4
-        ...    expected=Azure Storage account health should be enabled in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_RESOURCE_GROUP}`
-        ...    actual=Azure Storage account health appears unavailable in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_RESOURCE_GROUP}`
+        ...    expected=Azure Storage account health should be enabled in resource group `${AZURE_RESOURCE_GROUP}`
+        ...    actual=Azure Storage account health appears unavailable in resource group `${AZURE_RESOURCE_GROUP}`
         ...    title=Azure resource health is unavailable for Azure Storage account in resource group `${AZURE_RESOURCE_GROUP}`
         ...    reproduce_hint=$${output.cmd}
         ...    details=${health_list}
@@ -220,12 +220,12 @@ List Storage Containers with Public Access in resource group `${AZURE_RESOURCE_G
             
             RW.Core.Add Issue
             ...    severity=3
-            ...    expected=Azure storage container `${container_name}` should have restricted public access (None) in resource group `${resource_group}`
+            ...    expected=Azure storage container `${container_name}` should have restricted public access in resource group `${resource_group}`
             ...    actual=Azure storage container `${container_name}` has public access level '${public_access}' (${access_description}) in resource group `${resource_group}`
             ...    title=Public Accessible Azure Storage Container `${container_name}` found in Resource Group `${resource_group}`
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details=${pretty_container}
-            ...    next_steps=Restrict public access to the storage container to improve security in resource group `${resource_group}`. Set publicAccess to 'None' to completely disable public access.
+            ...    next_steps=Restrict public access to the storage container to improve security in resource group `${resource_group}`.
         END
     ELSE
         RW.Core.Add Pre To Report    "No public accessible storage containers found in resource group `${AZURE_RESOURCE_GROUP}`"
