@@ -105,7 +105,7 @@ resource "azurerm_public_ip" "example_unused" {
   name                = "unused-public-ip"
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
-  allocation_method   = "Static" # You can also use "Dynamic" if preferred
+  allocation_method   = "Static"   # You can also use "Dynamic" if preferred
   sku                 = "Standard" # "Basic" or "Standard"
   tags                = var.tags
 }
@@ -114,4 +114,67 @@ resource "azurerm_public_ip" "example_unused" {
 resource "local_file" "private_key" {
   content  = tls_private_key.ssh_key.private_key_pem
   filename = "spot-vm-key.pem"
+}
+
+
+
+resource "azurerm_network_interface" "nic-no-agent" {
+  name                = "test-nic-no-agent"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+
+  ip_configuration {
+    name                          = "internal"
+    subnet_id                     = azurerm_subnet.subnet.id
+    private_ip_address_allocation = "Dynamic"
+  }
+}
+
+resource "azurerm_linux_virtual_machine" "vm-no-agent" {
+  name                = "test-vm-no-agent"
+  resource_group_name = azurerm_resource_group.rg.name
+  location            = azurerm_resource_group.rg.location
+  size                = "Standard_DS1_v2"
+  admin_username      = "adminuser"
+  
+  # Disable VM agent
+  disable_password_authentication = true
+  admin_ssh_key {
+    username   = "adminuser"
+    public_key = tls_private_key.ssh_key.public_key_openssh
+  }
+
+  network_interface_ids = [
+    azurerm_network_interface.nic-no-agent.id,
+  ]
+
+  os_disk {
+    caching              = "ReadWrite"
+    storage_account_type = "Standard_LRS"
+  }
+
+  source_image_reference {
+    publisher = "Canonical"
+    offer     = "UbuntuServer"
+    sku       = "18.04-LTS"
+    version   = "latest"
+  }
+
+  # Explicitly disable VM agent
+  identity {
+    type = "SystemAssigned"
+  }
+
+  # Configure as spot instance
+  priority        = "Spot"
+  eviction_policy = "Deallocate"
+
+  # Disable VM agent
+  custom_data = base64encode(<<-EOF
+    #!/bin/bash
+    apt-get update
+    apt-get remove -y walinuxagent
+    systemctl disable waagent
+  EOF
+  )
 }

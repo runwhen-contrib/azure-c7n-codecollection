@@ -34,11 +34,11 @@ Check Azure VM Health in resource group `${AZURE_RESOURCE_GROUP}`
     END
     IF    len(@{health_list}) > 0
         ${healthy_count}=    Evaluate    sum(1 for health in ${health_list} if health['properties']['availabilityState'] == 'Available')    json
-        ${healthy_score}=    Evaluate    1 if int(${healthy_count}) == len(${health_list}) else 0
+        ${vm_health_score}=    Evaluate    1 if int(${healthy_count}) == len(${health_list}) else 0
     ELSE
-        ${healthy_score}=    Set Variable    0
+        ${vm_health_score}=    Set Variable    0
     END
-    Set Global Variable    ${healthy_score}
+    Set Global Variable    ${vm_health_score}
 
 Check for VMs With Public IP in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Lists VMs with public IP address
@@ -52,21 +52,6 @@ Check for VMs With Public IP in resource group `${AZURE_RESOURCE_GROUP}`
     ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-health/vm-with-public-ip/metadata.json | jq '.metrics[] | select(.MetricName == "ResourceCount") | .Value';
     ${vm_with_public_ip_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_VM_WITH_PUBLIC_IP}) else 0
     Set Global Variable    ${vm_with_public_ip_score}
-
-Check for VMs With High CPU Usage in resource group `${AZURE_RESOURCE_GROUP}`
-    [Documentation]    Checks for VMs with high CPU usage
-    [Tags]    VM    Azure    CPU    Performance    access:read-only
-    CloudCustodian.Core.Generate Policy   
-    ...    ${CURDIR}/vm-cpu-usage.j2
-    ...    cpu_percentage=${HIGH_CPU_PERCENTAGE}
-    ...    timeframe=${HIGH_CPU_TIMEFRAME}
-    ...    resourceGroup=${AZURE_RESOURCE_GROUP}
-    ${c7n_output}=    RW.CLI.Run Cli
-    ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/vm-cpu-usage.yaml --cache-period 0
-    ${count}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-health/vm-cpu-usage/metadata.json | jq '.metrics[] | select(.MetricName == "ResourceCount") | .Value';
-    ${cpu_usage_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_VM_WITH_HIGH_CPU}) else 0
-    Set Global Variable    ${cpu_usage_score}
 
 Check for Stopped VMs in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Count VMs that are in a stopped state
@@ -82,6 +67,47 @@ Check for Stopped VMs in resource group `${AZURE_RESOURCE_GROUP}`
     ${stopped_vm_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_STOPPED_VM}) else 0
     Set Global Variable    ${stopped_vm_score}
 
+Check for VMs With High CPU Usage in resource group `${AZURE_RESOURCE_GROUP}`
+    [Documentation]    Checks for VMs with high CPU usage
+    [Tags]    VM    Azure    CPU    Performance    access:read-only
+    CloudCustodian.Core.Generate Policy   
+    ...    ${CURDIR}/vm-cpu-usage.j2
+    ...    cpu_percentage=${HIGH_CPU_PERCENTAGE}
+    ...    timeframe=${HIGH_CPU_TIMEFRAME}
+    ...    resourceGroup=${AZURE_RESOURCE_GROUP}
+    ${c7n_output}=    RW.CLI.Run Cli
+    ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/vm-cpu-usage.yaml --cache-period 0
+    ${report_data}=    RW.CLI.Run Cli
+    ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-health/vm-cpu-usage/resources.json
+
+    TRY
+        ${vm_list}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
+    EXCEPT
+        Log    Failed to load JSON payload, defaulting to empty list.    WARN
+        ${vm_list}=    Create List
+    END
+
+    ${high_cpu_count}=    Set Variable    ${0}
+    ${metrics_unavailable}=    Set Variable    ${False}
+    FOR    ${vm}    IN    @{vm_list}
+        ${json_str}=    Evaluate    json.dumps(${vm})    json
+        ${metrics_available}=    RW.CLI.Run Cli
+        ...    cmd=echo '${json_str}' | jq -r '(."c7n:metrics" | to_entries | map(.value.measurement[0]) | first) != null'
+        ${metrics_available_clean}=    Strip String    ${metrics_available.stdout}
+        IF    "${metrics_available_clean}" == "true"
+            ${cpu_percentage_result}=    RW.CLI.Run Cli
+            ...    cmd=echo '${json_str}' | jq -r '(."c7n:metrics" | to_entries | map(.value.measurement[0]) | first // "0")'
+            ${cpu_percentage}=    Convert To Number    ${cpu_percentage_result.stdout}    2
+            IF    ${cpu_percentage} > ${HIGH_CPU_PERCENTAGE}
+                ${high_cpu_count}=    Evaluate    ${high_cpu_count} + 1
+            END
+        ELSE
+            ${metrics_unavailable}=    Set Variable    ${True}
+        END
+    END
+    ${cpu_usage_score}=    Evaluate    1 if ${metrics_unavailable} else (1 if ${high_cpu_count} <= int(${MAX_VM_WITH_HIGH_CPU}) else 0)
+    Set Global Variable    ${cpu_usage_score}
+
 Check for Underutilized VMs Based on CPU Usage in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Count VMs that are underutilized based on CPU usage
     [Tags]    VM    Azure    CPU    Utilization    access:read-only
@@ -92,9 +118,35 @@ Check for Underutilized VMs Based on CPU Usage in resource group `${AZURE_RESOUR
     ...    resourceGroup=${AZURE_RESOURCE_GROUP}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/under-utilized-vm-cpu-usage.yaml --cache-period 0
-    ${count}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-health/under-utilized-vm-cpu-usage/metadata.json | jq '.metrics[] | select(.MetricName == "ResourceCount") | .Value';
-    ${underutilized_vm_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_UNDERUTILIZED_VM}) else 0
+    ${report_data}=    RW.CLI.Run Cli
+    ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-health/under-utilized-vm-cpu-usage/resources.json
+
+    TRY
+        ${vm_list}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
+    EXCEPT
+        Log    Failed to load JSON payload, defaulting to empty list.    WARN
+        ${vm_list}=    Create List
+    END
+
+    ${underutilized_count}=    Set Variable    ${0}
+    ${metrics_unavailable}=    Set Variable    ${False}
+    FOR    ${vm}    IN    @{vm_list}
+        ${json_str}=    Evaluate    json.dumps(${vm})    json
+        ${metrics_available}=    RW.CLI.Run Cli
+        ...    cmd=echo '${json_str}' | jq -r '(."c7n:metrics" | to_entries | map(.value.measurement[0]) | first) != null'
+        ${metrics_available_clean}=    Strip String    ${metrics_available.stdout}
+        IF    "${metrics_available_clean}" == "true"
+            ${cpu_percentage_result}=    RW.CLI.Run Cli
+            ...    cmd=echo '${json_str}' | jq -r '(."c7n:metrics" | to_entries | map(.value.measurement[0]) | first // "0")'
+            ${cpu_percentage}=    Convert To Number    ${cpu_percentage_result.stdout}    2
+            IF    ${cpu_percentage} < ${LOW_CPU_PERCENTAGE}
+                ${underutilized_count}=    Evaluate    ${underutilized_count} + 1
+            END
+        ELSE
+            ${metrics_unavailable}=    Set Variable    ${True}
+        END
+    END
+    ${underutilized_vm_score}=    Evaluate    1 if ${metrics_unavailable} else (1 if ${underutilized_count} <= int(${MAX_UNDERUTILIZED_VM}) else 0)
     Set Global Variable    ${underutilized_vm_score}
 
 Check for VMs With High Memory Usage in resource group `${AZURE_RESOURCE_GROUP}`
@@ -107,9 +159,36 @@ Check for VMs With High Memory Usage in resource group `${AZURE_RESOURCE_GROUP}`
     ...    resourceGroup=${AZURE_RESOURCE_GROUP}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/vm-memory-usage.yaml --cache-period 0
-    ${count}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-health/vm-memory-usage/metadata.json | jq '.metrics[] | select(.MetricName == "ResourceCount") | .Value';
-    ${high_memory_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_VM_WITH_HIGH_MEMORY}) else 0
+    ${report_data}=    RW.CLI.Run Cli
+    ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-health/vm-memory-usage/resources.json
+
+    TRY
+        ${vm_list}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
+    EXCEPT
+        Log    Failed to load JSON payload, defaulting to empty list.    WARN
+        ${vm_list}=    Create List
+    END
+
+    ${high_memory_count}=    Set Variable    ${0}
+    ${metrics_unavailable}=    Set Variable    ${False}
+    FOR    ${vm}    IN    @{vm_list}
+        ${json_str}=    Evaluate    json.dumps(${vm})    json
+        ${metrics_available}=    RW.CLI.Run Cli
+        ...    cmd=echo '${json_str}' | jq -r '(."c7n:metrics" | to_entries | map(.value.measurement[0]) | first) != null'
+        ${metrics_available_clean}=    Strip String    ${metrics_available.stdout}
+        IF    "${metrics_available_clean}" == "true"
+            ${memory_percentage_result}=    RW.CLI.Run Cli
+            ...    cmd=echo '${json_str}' | jq -r '(."c7n:metrics" | to_entries | map(.value.measurement[0]) | first // "0")'
+            ${available_memory}=    Convert To Number    ${memory_percentage_result.stdout}    2
+            ${memory_percentage}=    Evaluate    round(100 - ${available_memory}, 2)
+            IF    ${memory_percentage} > ${HIGH_MEMORY_PERCENTAGE}
+                ${high_memory_count}=    Evaluate    ${high_memory_count} + 1
+            END
+        ELSE
+            ${metrics_unavailable}=    Set Variable    ${True}
+        END
+    END
+    ${high_memory_score}=    Evaluate    1 if ${metrics_unavailable} else (1 if ${high_memory_count} <= int(${MAX_VM_WITH_HIGH_MEMORY}) else 0)
     Set Global Variable    ${high_memory_score}
 
 Check for Underutilized VMs Based on Memory Usage in resource group `${AZURE_RESOURCE_GROUP}`
@@ -122,9 +201,36 @@ Check for Underutilized VMs Based on Memory Usage in resource group `${AZURE_RES
     ...    resourceGroup=${AZURE_RESOURCE_GROUP}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/vm-memory-usage.yaml --cache-period 0
-    ${count}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-health/vm-memory-usage/metadata.json | jq '.metrics[] | select(.MetricName == "ResourceCount") | .Value';
-    ${underutilized_memory_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_UNDERUTILIZED_VM_MEMORY}) else 0
+    ${report_data}=    RW.CLI.Run Cli
+    ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-health/vm-memory-usage/resources.json
+
+    TRY
+        ${vm_list}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
+    EXCEPT
+        Log    Failed to load JSON payload, defaulting to empty list.    WARN
+        ${vm_list}=    Create List
+    END
+
+    ${underutilized_memory_count}=    Set Variable    ${0}
+    ${metrics_unavailable}=    Set Variable    ${False}
+    FOR    ${vm}    IN    @{vm_list}
+        ${json_str}=    Evaluate    json.dumps(${vm})    json
+        ${metrics_available}=    RW.CLI.Run Cli
+        ...    cmd=echo '${json_str}' | jq -r '(."c7n:metrics" | to_entries | map(.value.measurement[0]) | first) != null'
+        ${metrics_available_clean}=    Strip String    ${metrics_available.stdout}
+        IF    "${metrics_available_clean}" == "true"
+            ${memory_percentage_result}=    RW.CLI.Run Cli
+            ...    cmd=echo '${json_str}' | jq -r '(."c7n:metrics" | to_entries | map(.value.measurement[0]) | first // "0")'
+            ${available_memory}=    Convert To Number    ${memory_percentage_result.stdout}    2
+            ${memory_percentage}=    Evaluate    round(100 - ${available_memory}, 2)
+            IF    ${memory_percentage} < ${LOW_MEMORY_PERCENTAGE}
+                ${underutilized_memory_count}=    Evaluate    ${underutilized_memory_count} + 1
+            END
+        ELSE
+            ${metrics_unavailable}=    Set Variable    ${True}
+        END
+    END
+    ${underutilized_memory_score}=    Evaluate    1 if ${metrics_unavailable} else (1 if ${underutilized_memory_count} <= int(${MAX_UNDERUTILIZED_VM_MEMORY}) else 0)
     Set Global Variable    ${underutilized_memory_score}
 
 Check for Unused Network Interfaces in resource group `${AZURE_RESOURCE_GROUP}`
@@ -154,8 +260,22 @@ Check for Unused Public IPs in resource group `${AZURE_RESOURCE_GROUP}`
     ${unused_public_ip_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_UNUSED_PUBLIC_IP}) else 0
     Set Global Variable    ${unused_public_ip_score}
 
+Check VMs Agent Status in resource group `${AZURE_RESOURCE_GROUP}`
+    [Documentation]    Lists VMs that have VM agent status issues
+    [Tags]    VM    Azure    Agent    Health    access:read-only
+    CloudCustodian.Core.Generate Policy
+    ...    vm-agent-status.j2
+    ...    resourceGroup=${AZURE_RESOURCE_GROUP}
+    ${c7n_output}=    RW.CLI.Run Cli
+    ...    cmd=custodian run -s azure-c7n-vm-health vm-agent-status.yaml --cache-period 0
+    ${count}=    RW.CLI.Run Cli
+    ...    cmd=cat azure-c7n-vm-health/vm-agent-status/metadata.json | jq '.metrics[] | select(.MetricName == "ResourceCount") | .Value';
+    ${vm_agent_status_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_VM_AGENT_STATUS}) else 0
+    Set Global Variable    ${vm_agent_status_score}
+
+
 Generate Health Score
-    ${health_score}=    Evaluate  (${vm_with_public_ip_score} + ${cpu_usage_score} + ${stopped_vm_score} + ${underutilized_vm_score} + ${high_memory_score} + ${underutilized_memory_score} + ${unused_nic_score} + ${unused_public_ip_score} + ${healthy_score}) / 9
+    ${health_score}=    Evaluate  (${vm_with_public_ip_score} + ${cpu_usage_score} + ${stopped_vm_score} + ${underutilized_vm_score} + ${high_memory_score} + ${underutilized_memory_score} + ${unused_nic_score} + ${unused_public_ip_score} + ${vm_health_score} + ${vm_agent_status_score}) / 10
     ${health_score}=    Convert to Number    ${health_score}  2
     RW.Core.Push Metric    ${health_score}
 
@@ -278,6 +398,12 @@ Suite Initialization
     ...    pattern=^\d+$
     ...    example=1
     ...    default=0
+    ${MAX_VM_AGENT_STATUS}=    RW.Core.Import User Variable    MAX_VM_AGENT_STATUS
+    ...    type=string
+    ...    description=The maximum number of VMs with agent status issues to allow.
+    ...    pattern=^\d+$
+    ...    example=1
+    ...    default=0
     Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}    ${AZURE_SUBSCRIPTION_ID}
     Set Suite Variable    ${AZURE_RESOURCE_GROUP}    ${AZURE_RESOURCE_GROUP}
     Set Suite Variable    ${HIGH_CPU_PERCENTAGE}    ${HIGH_CPU_PERCENTAGE}
@@ -295,7 +421,8 @@ Suite Initialization
     Set Suite Variable    ${LOW_MEMORY_TIMEFRAME}    ${LOW_MEMORY_TIMEFRAME}
     Set Suite Variable    ${MAX_UNDERUTILIZED_VM_MEMORY}    ${MAX_UNDERUTILIZED_VM_MEMORY}
     Set Suite Variable    ${MAX_UNUSED_NIC}    ${MAX_UNUSED_NIC}
-    set Suite Variable    ${MAX_UNUSED_PUBLIC_IP}    ${MAX_UNUSED_PUBLIC_IP}
+    Set Suite Variable    ${MAX_UNUSED_PUBLIC_IP}    ${MAX_UNUSED_PUBLIC_IP}
+    Set Suite Variable    ${MAX_VM_AGENT_STATUS}    ${MAX_VM_AGENT_STATUS}
     Set Suite Variable
     ...    ${env}
     ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}"}
