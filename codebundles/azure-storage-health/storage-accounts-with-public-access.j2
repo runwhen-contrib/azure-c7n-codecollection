@@ -6,6 +6,9 @@ policies:
         key: properties.networkAcls.defaultAction
         value: "Allow"
       - type: value
+        key: properties.allowBlobPublicAccess
+        value: true
+      - type: value
         key: resourceGroup
         op: eq
         value: {{resourceGroup}}

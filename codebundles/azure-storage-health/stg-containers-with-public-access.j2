@@ -1,0 +1,14 @@
+policies:
+  - name: storage-container-public
+    description: |
+      Find all containers with public access enabled
+    resource: azure.storage-container
+    filters:
+      - type: value
+        key: properties.publicAccess
+        op: not-equal
+        value: None   # Possible values: Blob, Container, None
+      - type: value
+        key: resourceGroup
+        op: eq
+        value: {{resourceGroup}}
