@@ -83,7 +83,7 @@ for row in $(echo "$storage_accounts" | jq -c '.[]'); do
       "Blob public access enabled" \
       "Enabling public blob access can lead to unauthorized data exposure." \
       "Set allowBlobPublicAccess to false to block anonymous access." \
-      3
+      4
   fi
 
   shared_key_access=$(echo "$props" | jq -r '.allowSharedKeyAccess // true')
@@ -92,7 +92,7 @@ for row in $(echo "$storage_accounts" | jq -c '.[]'); do
       "Shared key access is enabled" \
       "Shared keys provide full access and are less secure than identity-based access." \
       "Set allowSharedKeyAccess to false and use Azure AD/MSI instead." \
-      2
+      4
   fi
 
   oauth_default=$(echo "$props" | jq -r '.defaultToOAuthAuthentication // false')
@@ -101,7 +101,7 @@ for row in $(echo "$storage_accounts" | jq -c '.[]'); do
       "OAuth not enabled as default auth" \
       "OAuth (Azure AD) is more secure and enforces identity-based access." \
       "Set defaultToOAuthAuthentication to true to prefer OAuth over keys." \
-      2
+      4
   fi
 
   has_identity=$(echo "$props" | jq -r '.identity.type // empty')
@@ -110,7 +110,7 @@ for row in $(echo "$storage_accounts" | jq -c '.[]'); do
       "No managed identity assigned" \
       "Managed identities allow secure service-to-service communication without secrets." \
       "Assign a system- or user-assigned managed identity." \
-      2
+      4
   fi
 
   https_only=$(echo "$props" | jq -r '.enableHttpsTrafficOnly')
@@ -119,7 +119,7 @@ for row in $(echo "$storage_accounts" | jq -c '.[]'); do
       "HTTPS not enforced" \
       "Unencrypted HTTP exposes data in transit. HTTPS ensures secure communication." \
       "Enable HTTPS-only access by setting enableHttpsTrafficOnly to true." \
-      3
+      4
   fi
 
   tls_ver=$(echo "$props" | jq -r '.minimumTlsVersion')
@@ -128,7 +128,7 @@ for row in $(echo "$storage_accounts" | jq -c '.[]'); do
       "Weak TLS version in use" \
       "TLS versions below 1.2 are deprecated and considered insecure." \
       "Set minimumTlsVersion to TLS1_2 or higher." \
-      3
+      4
   fi
 
   net_action=$(echo "$props" | jq -r '.networkRuleSet.defaultAction')
@@ -140,7 +140,7 @@ for row in $(echo "$storage_accounts" | jq -c '.[]'); do
       "Storage open to all networks" \
       "Open access increases risk of unauthorized access and violates zero-trust." \
       "Restrict access by setting defaultAction to Deny and configuring IP/VNet rules." \
-      3
+      4
   fi
 done
 
