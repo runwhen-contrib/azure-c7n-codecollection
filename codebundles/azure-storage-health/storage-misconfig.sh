@@ -7,49 +7,49 @@ set -euo pipefail
 resource_group="$AZURE_RESOURCE_GROUP"
 subscription_id="$AZURE_RESOURCE_SUBSCRIPTION_ID"
 output_file="storage_misconfig.json"
-issues_json='{"issues": []}'
+grouped_json='{"storage_accounts": []}'
 
-echo "🔍 Scanning Azure Storage Accounts for security misconfigurations..."
-echo "Subscription: $subscription_id"
+echo "🔍 Scanning Azure Storage Accounts for misconfigurations..."
 echo "Resource Group: $resource_group"
 
-# Get list of storage accounts
+# List all storage accounts
 if ! storage_accounts=$(az storage account list -g "$resource_group" --subscription "$subscription_id" -o json 2>storage_list_err.log); then
-    err_msg=$(cat storage_list_err.log)
-    rm -f storage_list_err.log
     echo "❌ Failed to list storage accounts"
+    cat storage_list_err.log
     exit 1
 fi
 rm -f storage_list_err.log
 
-check_and_add_issue() {
-  local title="$1"
-  local detail="$2"
+# Add issue to grouped JSON
+add_issue_to_account() {
+  local name="$1"
+  local title="$2"
   local reason="$3"
   local next_step="$4"
   local severity="$5"
-  local name="$6"
-  local url="$7"
 
-  issues_json=$(echo "$issues_json" | jq \
+  grouped_json=$(echo "$grouped_json" | jq \
+    --arg name "$name" \
     --arg title "$title" \
-    --argjson details "$detail" \
     --arg reason "$reason" \
     --arg next_step "$next_step" \
     --argjson severity "$severity" \
-    --arg name "$name" \
-    --arg resource_url "$url" \
-    '.issues += [{
-        "title": $title,
-        "details": $details,
-        "reason": $reason,
-        "next_step": $next_step,
-        "severity": $severity,
-        "name": $name,
-        "resource_url": $resource_url
-     }]')
+    '
+    .storage_accounts |= map(
+      if .name == $name then
+        .issues += [{
+          "title": $title,
+          "reason": $reason,
+          "next_step": $next_step,
+          "severity": $severity
+        }]
+      else
+        .
+      end
+    )')
 }
 
+# Loop through storage accounts
 for row in $(echo "$storage_accounts" | jq -c '.[]'); do
   name=$(echo "$row" | jq -r '.name')
   id=$(echo "$row" | jq -r '.id')
@@ -58,83 +58,77 @@ for row in $(echo "$storage_accounts" | jq -c '.[]'); do
   echo "🔹 Checking $name"
 
   if ! props=$(az storage account show --name "$name" --resource-group "$resource_group" --subscription "$subscription_id" -o json 2>prop_err.log); then
-      echo "⚠️  Could not retrieve details for $name"
-      continue
+    echo "⚠️ Could not retrieve properties for $name"
+    continue
   fi
   rm -f prop_err.log
-  detail_json=$(echo "$props" | jq '.')
+  props_json=$(echo "$props" | jq '.')
 
-  # Checks
+  # Initialize entry in grouped JSON
+  grouped_json=$(echo "$grouped_json" | jq \
+    --arg name "$name" \
+    --arg url "$url" \
+    --argjson details "$props_json" \
+    '.storage_accounts += [{
+      "name": $name,
+      "resource_url": $url,
+      "details": $details,
+      "issues": []
+    }]')
+
+  # Checks begin
   allow_blob_public=$(echo "$props" | jq -r '.allowBlobPublicAccess // true')
   if [[ "$allow_blob_public" == "true" ]]; then
-      check_and_add_issue \
-        "Blob public access enabled in $name" \
-        "$detail_json" \
-        "Enabling public blob access can lead to unauthorized data exposure. Microsoft recommends disabling this to prevent data leaks." \
-        "Set allowBlobPublicAccess to false to block anonymous access to containers and blobs." \
-        3 \
-        "$name" \
-        "$url"
+    add_issue_to_account "$name" \
+      "Blob public access enabled" \
+      "Enabling public blob access can lead to unauthorized data exposure." \
+      "Set allowBlobPublicAccess to false to block anonymous access." \
+      3
   fi
 
   shared_key_access=$(echo "$props" | jq -r '.allowSharedKeyAccess // true')
   if [[ "$shared_key_access" == "true" ]]; then
-      check_and_add_issue \
-        "Shared key access is enabled in $name" \
-        "$detail_json" \
-        "Shared keys provide full access and are less secure than identity-based access. Disabling them helps enforce least privilege access." \
-        "Set allowSharedKeyAccess to false and use Azure AD/MSI instead." \
-        2 \
-        "$name" \
-        "$url"
+    add_issue_to_account "$name" \
+      "Shared key access is enabled" \
+      "Shared keys provide full access and are less secure than identity-based access." \
+      "Set allowSharedKeyAccess to false and use Azure AD/MSI instead." \
+      2
   fi
 
   oauth_default=$(echo "$props" | jq -r '.defaultToOAuthAuthentication // false')
   if [[ "$oauth_default" != "true" ]]; then
-      check_and_add_issue \
-        "OAuth is not default authentication for $name" \
-        "$detail_json" \
-        "OAuth (Azure AD) is the recommended authentication method for secure, identity-based access." \
-        "Set defaultToOAuthAuthentication to true to enforce Azure AD auth." \
-        2 \
-        "$name" \
-        "$url"
+    add_issue_to_account "$name" \
+      "OAuth not enabled as default auth" \
+      "OAuth (Azure AD) is more secure and enforces identity-based access." \
+      "Set defaultToOAuthAuthentication to true to prefer OAuth over keys." \
+      2
   fi
 
   has_identity=$(echo "$props" | jq -r '.identity.type // empty')
   if [[ -z "$has_identity" ]]; then
-      check_and_add_issue \
-        "No Managed Identity assigned to $name" \
-        "$detail_json" \
-        "A managed identity enables secure and credential-free access to other Azure services." \
-        "Assign a system- or user-assigned identity to enable secure authentication." \
-        2 \
-        "$name" \
-        "$url"
+    add_issue_to_account "$name" \
+      "No managed identity assigned" \
+      "Managed identities allow secure service-to-service communication without secrets." \
+      "Assign a system- or user-assigned managed identity." \
+      2
   fi
 
   https_only=$(echo "$props" | jq -r '.enableHttpsTrafficOnly')
   if [[ "$https_only" != "true" ]]; then
-      check_and_add_issue \
-        "HTTPS not enforced for $name" \
-        "$detail_json" \
-        "Allowing HTTP connections can expose data in transit. HTTPS ensures secure encryption." \
-        "Set enableHttpsTrafficOnly to true." \
-        3 \
-        "$name" \
-        "$url"
+    add_issue_to_account "$name" \
+      "HTTPS not enforced" \
+      "Unencrypted HTTP exposes data in transit. HTTPS ensures secure communication." \
+      "Enable HTTPS-only access by setting enableHttpsTrafficOnly to true." \
+      3
   fi
 
   tls_ver=$(echo "$props" | jq -r '.minimumTlsVersion')
   if [[ "$tls_ver" != "TLS1_2" && "$tls_ver" != "TLS1_3" ]]; then
-      check_and_add_issue \
-        "Outdated TLS version for $name" \
-        "$detail_json" \
-        "Older TLS versions are vulnerable to known exploits. TLS 1.2 or 1.3 is required for compliance." \
-        "Set minimumTlsVersion to TLS1_2 or higher." \
-        3 \
-        "$name" \
-        "$url"
+    add_issue_to_account "$name" \
+      "Weak TLS version in use" \
+      "TLS versions below 1.2 are deprecated and considered insecure." \
+      "Set minimumTlsVersion to TLS1_2 or higher." \
+      3
   fi
 
   net_action=$(echo "$props" | jq -r '.networkRuleSet.defaultAction')
@@ -142,17 +136,14 @@ for row in $(echo "$storage_accounts" | jq -c '.[]'); do
   vnet_count=$(echo "$props" | jq '.networkRuleSet.virtualNetworkRules | length')
 
   if [[ "$net_action" == "Allow" && "$ip_count" == 0 && "$vnet_count" == 0 ]]; then
-      check_and_add_issue \
-        "Storage account $name is open to all networks" \
-        "$detail_json" \
-        "Leaving storage accounts open to all networks increases attack surface and violates zero-trust principles." \
-        "Set defaultAction to Deny and define IP or VNet rules." \
-        3 \
-        "$name" \
-        "$url"
+    add_issue_to_account "$name" \
+      "Storage open to all networks" \
+      "Open access increases risk of unauthorized access and violates zero-trust." \
+      "Restrict access by setting defaultAction to Deny and configuring IP/VNet rules." \
+      3
   fi
 done
 
-# Write output
-echo "$issues_json" > "$output_file"
-echo "✅ Report written to: $output_file"
+# Write final grouped JSON
+echo "$grouped_json" > "$output_file"
+echo "✅ Report saved to: $output_file"
