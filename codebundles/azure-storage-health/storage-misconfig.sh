@@ -6,27 +6,18 @@ set -euo pipefail
 
 resource_group="$AZURE_RESOURCE_GROUP"
 subscription_id="$AZURE_RESOURCE_SUBSCRIPTION_ID"
-
-OUTPUT_FILE="storage_misconfig.json"
+output_file="storage_misconfig.json"
 issues_json='{"issues": []}'
 
-echo "\n🔍 Scanning Storage Accounts for security misconfigurations..."
-echo "Subscription ID: $subscription_id"
-echo "Resource Group:  $resource_group"
+echo "🔍 Scanning Azure Storage Accounts for security misconfigurations..."
+echo "Subscription: $subscription_id"
+echo "Resource Group: $resource_group"
 
-# List Storage Accounts
-if ! storage_accounts=$(az storage account list -g "$resource_group" --subscription "$subscription_id" --query "[].{id:id,name:name,resourceGroup:resourceGroup}" -o json 2>storage_list_err.log); then
+# Get list of storage accounts
+if ! storage_accounts=$(az storage account list -g "$resource_group" --subscription "$subscription_id" -o json 2>storage_list_err.log); then
     err_msg=$(cat storage_list_err.log)
     rm -f storage_list_err.log
-
-    issues_json=$(echo "$issues_json" | jq \
-        --arg title "Failed to List Storage Accounts" \
-        --arg details "$err_msg" \
-        --arg reason "Could not retrieve storage account list from Azure CLI." \
-        --arg nextStep "Ensure correct resource group and CLI permissions." \
-        --argjson severity 3 \
-        '.issues += [{"title": $title, "details": $details, "reason": $reason, "next_step": $nextStep, "severity": $severity}]')
-    echo "$issues_json" > "$OUTPUT_FILE"
+    echo "❌ Failed to list storage accounts"
     exit 1
 fi
 rm -f storage_list_err.log
@@ -37,106 +28,131 @@ check_and_add_issue() {
   local reason="$3"
   local next_step="$4"
   local severity="$5"
+  local name="$6"
+  local url="$7"
 
   issues_json=$(echo "$issues_json" | jq \
-      --arg title "$title" \
-      --arg details "$detail" \
-      --arg reason "$reason" \
-      --arg next_step "$next_step" \
-      --argjson severity "$severity" \
-      --arg name "$name" \
-      --arg resource_url "$url" \
-      '.issues += [{"title": $title, "details": $details, "reason": $reason, "next_step": $next_step, "severity": $severity, "name": $name, "resource_url": $resource_url}]')
+    --arg title "$title" \
+    --argjson details "$detail" \
+    --arg reason "$reason" \
+    --arg next_step "$next_step" \
+    --argjson severity "$severity" \
+    --arg name "$name" \
+    --arg resource_url "$url" \
+    '.issues += [{
+        "title": $title,
+        "details": $details,
+        "reason": $reason,
+        "next_step": $next_step,
+        "severity": $severity,
+        "name": $name,
+        "resource_url": $resource_url
+     }]')
 }
 
-for account in $(echo "$storage_accounts" | jq -c '.[]'); do
-    name=$(echo "$account" | jq -r '.name')
-    id=$(echo "$account" | jq -r '.id')
-    url="https://portal.azure.com/#@/resource${id}"
+for row in $(echo "$storage_accounts" | jq -c '.[]'); do
+  name=$(echo "$row" | jq -r '.name')
+  id=$(echo "$row" | jq -r '.id')
+  url="https://portal.azure.com/#@/resource${id}"
 
-    echo "\n🔹 Checking: $name"
+  echo "🔹 Checking $name"
 
-    if ! props=$(az storage account show --name "$name" --resource-group "$resource_group" --subscription "$subscription_id" -o json 2>prop_err.log); then
-        err_msg=$(cat prop_err.log)
-        rm -f prop_err.log
-        echo "Failed to retrieve properties for $name"
-        continue
-    fi
-    rm -f prop_err.log
+  if ! props=$(az storage account show --name "$name" --resource-group "$resource_group" --subscription "$subscription_id" -o json 2>prop_err.log); then
+      echo "⚠️  Could not retrieve details for $name"
+      continue
+  fi
+  rm -f prop_err.log
+  detail_json=$(echo "$props" | jq '.')
 
-    allowBlobPublicAccess=$(echo "$props" | jq -r '.allowBlobPublicAccess // true')
-    if [[ "$allowBlobPublicAccess" == "true" ]]; then
-        check_and_add_issue \
-          "Blob public access enabled in storage account \`$name\`" \
-          "allowBlobPublicAccess is true" \
-          "Public access to blobs can lead to unauthorized data exposure and compliance violations." \
-          "Set \`allowBlobPublicAccess=false\` to block anonymous public access." \
-          3
-    fi
+  # Checks
+  allow_blob_public=$(echo "$props" | jq -r '.allowBlobPublicAccess // true')
+  if [[ "$allow_blob_public" == "true" ]]; then
+      check_and_add_issue \
+        "Blob public access enabled in $name" \
+        "$detail_json" \
+        "Enabling public blob access can lead to unauthorized data exposure. Microsoft recommends disabling this to prevent data leaks." \
+        "Set allowBlobPublicAccess to false to block anonymous access to containers and blobs." \
+        3 \
+        "$name" \
+        "$url"
+  fi
 
-    allowSharedKeyAccess=$(echo "$props" | jq -r '.allowSharedKeyAccess // true')
-    if [[ "$allowSharedKeyAccess" == "true" ]]; then
-        check_and_add_issue \
-          "Shared key access is enabled in \`$name\`" \
-          "allowSharedKeyAccess is true" \
-          "Shared keys are less secure and harder to rotate than identity-based methods." \
-          "Disable shared key access to enforce authentication via Azure AD or Managed Identity." \
-          2
-    fi
+  shared_key_access=$(echo "$props" | jq -r '.allowSharedKeyAccess // true')
+  if [[ "$shared_key_access" == "true" ]]; then
+      check_and_add_issue \
+        "Shared key access is enabled in $name" \
+        "$detail_json" \
+        "Shared keys provide full access and are less secure than identity-based access. Disabling them helps enforce least privilege access." \
+        "Set allowSharedKeyAccess to false and use Azure AD/MSI instead." \
+        2 \
+        "$name" \
+        "$url"
+  fi
 
-    defaultToOAuthAuthentication=$(echo "$props" | jq -r '.defaultToOAuthAuthentication // false')
-    if [[ "$defaultToOAuthAuthentication" != "true" ]]; then
-        check_and_add_issue \
-          "OAuth not enforced in \`$name\`" \
-          "defaultToOAuthAuthentication is not true" \
-          "Using OAuth ensures access is governed via Azure AD, improving traceability and security." \
-          "Enable \`defaultToOAuthAuthentication\` to default to Azure AD-based auth." \
-          2
-    fi
+  oauth_default=$(echo "$props" | jq -r '.defaultToOAuthAuthentication // false')
+  if [[ "$oauth_default" != "true" ]]; then
+      check_and_add_issue \
+        "OAuth is not default authentication for $name" \
+        "$detail_json" \
+        "OAuth (Azure AD) is the recommended authentication method for secure, identity-based access." \
+        "Set defaultToOAuthAuthentication to true to enforce Azure AD auth." \
+        2 \
+        "$name" \
+        "$url"
+  fi
 
-    identityType=$(echo "$props" | jq -r '.identity.type // empty')
-    if [[ -z "$identityType" ]]; then
-        check_and_add_issue \
-          "No Managed Identity configured for \`$name\`" \
-          "identity.type is null" \
-          "Managed Identity allows secure, credential-free access to other Azure services." \
-          "Assign a System or User Assigned Managed Identity." \
-          2
-    fi
+  has_identity=$(echo "$props" | jq -r '.identity.type // empty')
+  if [[ -z "$has_identity" ]]; then
+      check_and_add_issue \
+        "No Managed Identity assigned to $name" \
+        "$detail_json" \
+        "A managed identity enables secure and credential-free access to other Azure services." \
+        "Assign a system- or user-assigned identity to enable secure authentication." \
+        2 \
+        "$name" \
+        "$url"
+  fi
 
-    httpsOnly=$(echo "$props" | jq -r '.enableHttpsTrafficOnly')
-    if [[ "$httpsOnly" != "true" ]]; then
-        check_and_add_issue \
-          "HTTP allowed on storage account \`$name\`" \
-          "enableHttpsTrafficOnly is false" \
-          "HTTP is insecure and allows plaintext transmission of data." \
-          "Enforce HTTPS-only traffic on the storage account." \
-          3
-    fi
+  https_only=$(echo "$props" | jq -r '.enableHttpsTrafficOnly')
+  if [[ "$https_only" != "true" ]]; then
+      check_and_add_issue \
+        "HTTPS not enforced for $name" \
+        "$detail_json" \
+        "Allowing HTTP connections can expose data in transit. HTTPS ensures secure encryption." \
+        "Set enableHttpsTrafficOnly to true." \
+        3 \
+        "$name" \
+        "$url"
+  fi
 
-    tlsVersion=$(echo "$props" | jq -r '.minimumTlsVersion')
-    if [[ "$tlsVersion" != "TLS1_2" && "$tlsVersion" != "TLS1_3" ]]; then
-        check_and_add_issue \
-          "Outdated TLS version on \`$name\`" \
-          "minimumTlsVersion is $tlsVersion" \
-          "Older TLS versions are vulnerable to known attacks like POODLE and BEAST." \
-          "Set \`minimumTlsVersion\` to at least TLS1_2." \
-          3
-    fi
+  tls_ver=$(echo "$props" | jq -r '.minimumTlsVersion')
+  if [[ "$tls_ver" != "TLS1_2" && "$tls_ver" != "TLS1_3" ]]; then
+      check_and_add_issue \
+        "Outdated TLS version for $name" \
+        "$detail_json" \
+        "Older TLS versions are vulnerable to known exploits. TLS 1.2 or 1.3 is required for compliance." \
+        "Set minimumTlsVersion to TLS1_2 or higher." \
+        3 \
+        "$name" \
+        "$url"
+  fi
 
-    defaultAction=$(echo "$props" | jq -r '.networkRuleSet.defaultAction')
-    ipCount=$(echo "$props" | jq '.networkRuleSet.ipRules | length')
-    vnetCount=$(echo "$props" | jq '.networkRuleSet.virtualNetworkRules | length')
-    if [[ "$defaultAction" == "Allow" && "$ipCount" == "0" && "$vnetCount" == "0" ]]; then
-        check_and_add_issue \
-          "Storage account \`$name\` is open to all networks" \
-          "defaultAction is Allow with no IP or VNet restrictions" \
-          "This allows unrestricted public access to storage endpoints, which is a high risk." \
-          "Set \`defaultAction=deny\` and configure appropriate IP or VNet rules." \
-          3
-    fi
+  net_action=$(echo "$props" | jq -r '.networkRuleSet.defaultAction')
+  ip_count=$(echo "$props" | jq '.networkRuleSet.ipRules | length')
+  vnet_count=$(echo "$props" | jq '.networkRuleSet.virtualNetworkRules | length')
 
+  if [[ "$net_action" == "Allow" && "$ip_count" == 0 && "$vnet_count" == 0 ]]; then
+      check_and_add_issue \
+        "Storage account $name is open to all networks" \
+        "$detail_json" \
+        "Leaving storage accounts open to all networks increases attack surface and violates zero-trust principles." \
+        "Set defaultAction to Deny and define IP or VNet rules." \
+        3 \
+        "$name" \
+        "$url"
+  fi
 done
 
-echo "$issues_json" > "$OUTPUT_FILE"
-echo "\nStorage account posture report saved to: $OUTPUT_FILE"
+# Write output
+echo "$issues_json" > "$output_file"
+echo "✅ Report written to: $output_file"
