@@ -96,6 +96,46 @@ resource "azurerm_cosmosdb_sql_container" "cosmos_sql_container" {
   throughput          = null
 }
 
+resource "azurerm_cosmosdb_account" "cosmosdb_account_serverless" {
+  name                = "${random_pet.name_prefix.id}-cosmosdb-sls"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+  offer_type          = "Standard"
+  kind                = "GlobalDocumentDB"
+  free_tier_enabled   = false # Free tier only allowed on one account per subscription
+
+  consistency_policy {
+    consistency_level = "Session"
+  }
+
+  capabilities {
+    name = "EnableServerless"
+  }
+
+  geo_location {
+    location          = azurerm_resource_group.rg.location
+    failover_priority = 0
+  }
+
+  tags = var.tags
+}
+
+resource "azurerm_cosmosdb_sql_database" "cosmos_sql_database_serverless" {
+  name                = "cosmosdb-sql-sls"
+  resource_group_name = azurerm_resource_group.rg.name
+  account_name        = azurerm_cosmosdb_account.cosmosdb_account_serverless.name
+}
+
+resource "azurerm_cosmosdb_sql_container" "cosmos_sql_container_serverless" {
+  name                = "cosmos-sql-container-sls"
+  resource_group_name = azurerm_resource_group.rg.name
+  account_name        = azurerm_cosmosdb_account.cosmosdb_account_serverless.name
+  database_name       = azurerm_cosmosdb_sql_database.cosmos_sql_database_serverless.name
+
+  partition_key_paths = ["/id"]
+  throughput          = null
+}
+
 resource "azurerm_redis_cache" "redis" {
   name                 = "${random_pet.name_prefix.id}-redis"
   location             = azurerm_resource_group.rg.location
