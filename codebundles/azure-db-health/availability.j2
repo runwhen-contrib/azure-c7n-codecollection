@@ -9,6 +9,15 @@ policies:
         threshold: {{threshold}}
         timeframe: {{timeframe}}
         interval: {{interval}}
+      {% if name == 'cosmosdb' %}
+      - type: metric
+        metric: TotalRequests
+        op: gt
+        aggregation: total
+        threshold: 0
+        timeframe: {{timeframe}}
+        interval: {{interval}}
+      {% endif %}
       - type: value
         key: resourceGroup
         op: eq
