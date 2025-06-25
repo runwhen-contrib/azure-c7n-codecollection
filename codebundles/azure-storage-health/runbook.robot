@@ -11,7 +11,7 @@ Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
 Library    CloudCustodian.Core
-
+Library    OperatingSystem
 Suite Setup         Suite Initialization
 
 
@@ -230,6 +230,61 @@ List Storage Containers with Public Access in resource group `${AZURE_RESOURCE_G
     ELSE
         RW.Core.Add Pre To Report    "No public accessible storage containers found in resource group `${AZURE_RESOURCE_GROUP}`"
     END
+
+List Storage accounts miss configuration in resource group `${AZURE_RESOURCE_GROUP}`
+    [Documentation]    Identify Azure storage accounts with security or configuration misconfigurations
+    [Tags]    Storage    Azure    Security    Configuration    access:read-only
+
+    # Execute the helper script that generates `storage_misconfig.json`
+    ${misconfig_cmd}=    RW.CLI.Run Bash File
+    ...    bash_file=storage-misconfig.sh
+    ...    env=${env}
+    ...    timeout_seconds=300
+    ...    include_in_history=false
+
+    ${log_file}=    Set Variable    storage_misconfig.json
+
+    # Load JSON results.  If the file is missing or malformed, report an issue and abort.
+    TRY
+        ${json_content}=    Get File    ${log_file}
+        ${data}=    Evaluate    json.loads('''${json_content}''')    json
+    EXCEPT    Exception as e
+        Log    Failed to load JSON payload, defaulting to empty result set. Error: ${str(e)}    WARN
+        ${data}=    Create Dictionary    storage_accounts=[]
+    END
+
+    ${accounts}=    Set Variable    ${data.get('storage_accounts', [])}
+
+    IF    len(${accounts}) > 0
+        # Summary table for report header
+        ${summary}=    RW.CLI.Run Cli
+        ...    cmd=jq -r '"Storage_Account\tIssues\tMax_Severity", (.storage_accounts[] | [.name, (.issues | length), (.issues | map(.severity) | max // 0)] | @tsv)' ${log_file} | column -t
+        RW.Core.Add Pre To Report    Storage Account Misconfigurations Summary:\n========================================\n${summary.stdout}
+
+        FOR    ${acct}    IN    @{accounts}
+            ${acct_name}=    Set Variable    ${acct['name']}
+            ${acct_url}=    Set Variable    ${acct.get('resource_url', 'N/A')}
+            ${issues}=    Set Variable    ${acct.get('issues', [])}
+            ${acct_pretty}=    Evaluate    json.dumps(${acct.get('details', {})}, indent=2)
+
+            FOR    ${issue}    IN    @{issues}
+                RW.Core.Add Issue
+                ...    severity=4
+                ...    expected=Storage account `${acct_name}` should not have: ${issue.get('title', 'misconfiguration')}
+                ...    actual=${issue.get('reason', 'Configuration issue detected')}
+                ...    title=Storage Misconfiguration: ${acct_name} - ${issue.get('title', 'Unknown')}
+                ...    reproduce_hint=${misconfig_cmd.cmd}
+                ...    next_steps=${issue.get('next_step', 'Review and remediate the misconfiguration.')}
+                ...    details=${acct_pretty}
+            END
+        END
+
+        ${total}=    Evaluate    sum(len(a.get('issues', [])) for a in ${accounts})
+        RW.Core.Add Pre To Report    Detected ${total} misconfiguration(s) across ${len(${accounts})} storage account(s) in resource group `${AZURE_RESOURCE_GROUP}`
+    ELSE
+        RW.Core.Add Pre To Report    "No storage account misconfigurations found in resource group `${AZURE_RESOURCE_GROUP}`"
+    END
+
 
 *** Keywords ***
 Suite Initialization
