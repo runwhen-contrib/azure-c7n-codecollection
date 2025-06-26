@@ -243,11 +243,11 @@ List Storage accounts miss configuration in resource group `${AZURE_RESOURCE_GRO
     ...    include_in_history=false
 
     ${log_file}=    Set Variable    storage_misconfig.json
-
+    ${misconfig_output}=    RW.CLI.Run Cli
+    ...    cmd=cat ${log_file}
     # Load JSON results.  If the file is missing or malformed, report an issue and abort.
     TRY
-        ${json_content}=    Get File    ${log_file}
-        ${data}=    Evaluate    json.loads('''${json_content}''')    json
+        ${data}=    Evaluate    json.loads('''${misconfig_output.stdout}''')    json
     EXCEPT    Exception as e
         Log    Failed to load JSON payload, defaulting to empty result set. Error: ${str(e)}    WARN
         ${data}=    Create Dictionary    storage_accounts=[]
@@ -256,11 +256,6 @@ List Storage accounts miss configuration in resource group `${AZURE_RESOURCE_GRO
     ${accounts}=    Set Variable    ${data.get('storage_accounts', [])}
 
     IF    $accounts
-        # Summary table for report header
-        ${summary}=    RW.CLI.Run Cli
-        ...    cmd=jq -r '"Storage_Account\tIssues\tMax_Severity", (.storage_accounts[] | [.name, (.issues | length), (.issues | map(.severity) | max // 0)] | @tsv)' ${log_file} | column -t
-        RW.Core.Add Pre To Report    Storage Account Misconfigurations Summary:\n========================================\n${summary.stdout}
-
         FOR    ${acct}    IN    @{accounts}
             ${acct_name}=    Set Variable    ${acct['name']}
             ${acct_url}=    Set Variable    ${acct.get('resource_url', 'N/A')}
@@ -274,39 +269,40 @@ List Storage accounts miss configuration in resource group `${AZURE_RESOURCE_GRO
             
             # Prepare combined issue details
             ${issue_descriptions}=    Create List
-            ${max_severity}=    Set Variable    0
+            ${next_steps_list}=    Create List
             
             FOR    ${issue}    IN    @{issues}
-                ${issue_severity}=    Set Variable    ${issue.get('severity', 2)}
-                ${max_severity}=    Set Variable If    ${issue_severity} > ${max_severity}    ${issue_severity}    ${max_severity}
-                
                 ${issue_details}=    Catenate    SEPARATOR=\n\n
-                ...    *${issue.get('title', 'Misconfiguration')}* (Severity: ${issue_severity})
+                ...    Issue: ${issue.get('title', 'Misconfiguration')}
                 ...    Reason: ${issue.get('reason', 'No reason provided')}
-                ...    Next Steps: ${issue.get('next_step', 'Review and remediate this misconfiguration.')}
+                
+                ${step}=    Set Variable    ${issue.get('next_step', 'Review and remediate this misconfiguration.')}
+                Append To List    ${next_steps_list}    ${step}
                 
                 Append To List    ${issue_descriptions}    ${issue_details}
             END
             
-            # Join all issue descriptions with a separator
-            ${combined_issues}=    Set Variable    ${EMPTY}
-            FOR    ${issue}    IN    @{issue_descriptions}
-                ${combined_issues}=    Catenate    ${combined_issues}    ${issue}    \n\n---\n\n
-            END
-            ${combined_issues}=    Set Variable    ${combined_issues.rstrip('\n-')}
+            # Build tabular misconfiguration list using jq and column
+            ${issues_json}=    Evaluate    json.dumps(${issues})    json
+            ${issues_table}=    RW.CLI.Run Cli
+            ...    cmd=echo '${issues_json}' | jq -r '"Issue\tReason", "----------\t-----------", (.[] | [.title, (.reason // "No reason provided")] | @tsv)' | column -s "\t" -t
+            ${combined_issues}=    Set Variable    ${issues_table.stdout}
+
+            # Combine all next steps into a single multiline string
+            ${combined_next_steps}=    Evaluate    '\\n'.join(${next_steps_list})
 
             # Get issue count
             ${issue_count}=    Get Length    ${issues}
-
+            RW.Core.Add Pre To Report    \nMisconfigurations in storage account ${acct_name}:\n====================================================\n${combined_issues}
             # Create a single issue for this storage account
             RW.Core.Add Issue
-            ...    severity=${max_severity}
-            ...    expected=Storage account `${acct_name}` should not have security misconfigurations
-            ...    actual=Found ${issue_count} misconfiguration(s) in storage account
+            ...    severity=4
+            ...    expected=Storage account `${acct_name}` should not have security misconfigurations in resource group `${AZURE_RESOURCE_GROUP}`
+            ...    actual=Found ${issue_count} misconfiguration(s) in storage account `${acct_name}` in resource group `${AZURE_RESOURCE_GROUP}`
             ...    title=Azure Storage Misconfiguration found in ${acct_name} in resource group `${AZURE_RESOURCE_GROUP}`
             ...    reproduce_hint=${misconfig_cmd.cmd}
-            ...    next_steps=Review and remediate all misconfigurations listed below.
-            ...    details=Account Details:\n${acct_pretty}\n\n=== Found ${issue_count} Misconfiguration(s) ===\n\n${combined_issues}
+            ...    next_steps=${combined_next_steps}
+            ...    details=${acct_pretty}
         END
 
         # Calculate overall totals
