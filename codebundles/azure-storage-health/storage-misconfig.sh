@@ -2,19 +2,19 @@
 set -euo pipefail
 
 : "${AZURE_RESOURCE_GROUP:?Must set AZURE_RESOURCE_GROUP}"
-: "${AZURE_RESOURCE_SUBSCRIPTION_ID:?Must set AZURE_RESOURCE_SUBSCRIPTION_ID}"
+: "${AZURE_SUBSCRIPTION_ID:?Must set AZURE_SUBSCRIPTION_ID}"
 
 resource_group="$AZURE_RESOURCE_GROUP"
-subscription_id="$AZURE_RESOURCE_SUBSCRIPTION_ID"
+subscription_id="$AZURE_SUBSCRIPTION_ID"
 output_file="storage_misconfig.json"
 grouped_json='{"storage_accounts": []}'
 
-echo "🔍 Scanning Azure Storage Accounts for misconfigurations..."
+echo "Scanning Azure Storage Accounts for misconfigurations..."
 echo "Resource Group: $resource_group"
 
 # List all storage accounts
 if ! storage_accounts=$(az storage account list -g "$resource_group" --subscription "$subscription_id" -o json 2>storage_list_err.log); then
-    echo "❌ Failed to list storage accounts"
+    echo "Failed to list storage accounts"
     cat storage_list_err.log
     exit 1
 fi
@@ -55,10 +55,10 @@ for row in $(echo "$storage_accounts" | jq -c '.[]'); do
   id=$(echo "$row" | jq -r '.id')
   url="https://portal.azure.com/#@/resource${id}"
 
-  echo "🔹 Checking $name"
+  echo "Checking $name"
 
   if ! props=$(az storage account show --name "$name" --resource-group "$resource_group" --subscription "$subscription_id" -o json 2>prop_err.log); then
-    echo "⚠️ Could not retrieve properties for $name"
+    echo "Could not retrieve properties for $name"
     continue
   fi
   rm -f prop_err.log
@@ -146,4 +146,4 @@ done
 
 # Write final grouped JSON
 echo "$grouped_json" > "$output_file"
-echo "✅ Report saved to: $output_file"
+echo "Report saved to: $output_file"
