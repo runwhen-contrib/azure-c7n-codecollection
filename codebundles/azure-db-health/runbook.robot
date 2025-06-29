@@ -190,7 +190,7 @@ List Databases Without Replication in resource group `${AZURE_RESOURCE_GROUP}`
                 ${resource_group}=    Set Variable    ${db['resourceGroup'].lower()}
                 ${db_name}=    Set Variable    ${db['name']}
                 RW.Core.Add Issue
-                ...    severity=3
+                ...    severity=4
                 ...    expected=${display_name} `${db_name}` should have replication configured in resource group `${resource_group}`
                 ...    actual=${display_name} `${db_name}` has no replication configured in resource group `${resource_group}`
                 ...    title=${display_name} `${db_name}` Without Replication Detected in Resource Group `${resource_group}`
@@ -249,7 +249,7 @@ List Databases Without High Availability in resource group `${AZURE_RESOURCE_GRO
                 ${resource_group}=    Set Variable    ${db['resourceGroup'].lower()}
                 ${db_name}=    Set Variable    ${db['name']}
                 RW.Core.Add Issue
-                ...    severity=3
+                ...    severity=4
                 ...    expected=${display_name} `${db_name}` should have high availability enabled in resource group `${resource_group}`
                 ...    actual=${display_name} `${db_name}` has high availability disabled in resource group `${resource_group}`
                 ...    title=${display_name} `${db_name}` Without High Availability Detected in Resource Group `${resource_group}`
