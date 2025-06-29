@@ -11,6 +11,7 @@ Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
 Library    CloudCustodian.Core
+Library    Collections
 
 Suite Setup         Suite Initialization
 *** Tasks ***
@@ -89,9 +90,34 @@ Count Storage Containers with Public Access in resource group `${AZURE_RESOURCE_
     ${public_access_container_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_PUBLIC_ACCESS_STORAGE_ACCOUNT}) else 0
     Set Global Variable    ${public_access_container_score}
 
+Count Storage accounts miss configuration in resource group `${AZURE_RESOURCE_GROUP}`
+    [Documentation]    Count storage accounts with misconfigurations
+    [Tags]    Storage    Azure    Security    access:read-only
+    
+    # Execute the helper script that generates `storage_misconfig.json`
+    ${misconfig_cmd}=    RW.CLI.Run Bash File
+    ...    bash_file=storage-misconfig.sh
+    ...    env=${env}
+    ...    timeout_seconds=300
+    ...    include_in_history=false
+
+    ${log_file}=    Set Variable    storage_misconfig.json
+    ${misconfig_output}=    RW.CLI.Run Cli
+    ...    cmd=cat ${log_file}
+    # Load JSON results.  If the file is missing or malformed, report an issue and abort.
+    TRY
+        ${data}=    Evaluate    json.loads('''${misconfig_output.stdout}''')    json
+    EXCEPT    Exception as e
+        Log    Failed to load JSON payload, defaulting to empty result set. Error: ${str(e)}    WARN
+        ${data}=    Create Dictionary    storage_accounts=[]
+    END
+    ${count}=    Evaluate    len(${data.get('storage_accounts', [])})
+    ${storage_misconfig_score}=    Evaluate    1 if int(${count}) <= int(${MAX_STORAGE_ACCOUNT_MISCONFIG}) else 0
+    Set Global Variable    ${storage_misconfig_score}
+
 
 Generate Health Score
-    ${health_score}=    Evaluate  (${unused_snapshot_score} + ${unused_disk_score} + ${unused_storage_account_score} + ${public_access_container_score} + ${available_storage_score}) / 5
+    ${health_score}=    Evaluate  (${unused_snapshot_score} + ${unused_disk_score} + ${unused_storage_account_score} + ${public_access_container_score} + ${available_storage_score} + ${storage_misconfig_score}) / 6
     ${health_score}=    Convert to Number    ${health_score}  2
     RW.Core.Push Metric    ${health_score}
 
@@ -141,12 +167,19 @@ Suite Initialization
     ...    pattern=^\d+$
     ...    example=1
     ...    default=0
+    ${MAX_STORAGE_ACCOUNT_MISCONFIG}=    RW.Core.Import User Variable    MAX_STORAGE_ACCOUNT_MISCONFIG
+    ...    type=string
+    ...    description=The maximum number of storage accounts with misconfigurations allowed in the subscription.
+    ...    pattern=^\d+$
+    ...    example=1
+    ...    default=0
     Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}    ${AZURE_SUBSCRIPTION_ID}
     Set Suite Variable    ${MAX_UNUSED_DISK}    ${MAX_UNUSED_DISK}
     Set Suite Variable    ${MAX_UNUSED_SNAPSHOT}    ${MAX_UNUSED_SNAPSHOT}
     set Suite Variable    ${UNUSED_STORAGE_ACCOUNT_TIMEFRAME}    ${UNUSED_STORAGE_ACCOUNT_TIMEFRAME}
     Set Suite Variable    ${MAX_UNUSED_STORAGE_ACCOUNT}    ${MAX_UNUSED_STORAGE_ACCOUNT}
     Set Suite Variable    ${MAX_PUBLIC_ACCESS_STORAGE_ACCOUNT}    ${MAX_PUBLIC_ACCESS_STORAGE_ACCOUNT}
+    Set Suite Variable    ${MAX_STORAGE_ACCOUNT_MISCONFIG}    ${MAX_STORAGE_ACCOUNT_MISCONFIG}
     Set Suite Variable    ${AZURE_RESOURCE_GROUP}    ${AZURE_RESOURCE_GROUP}
     Set Suite Variable
     ...    ${env}

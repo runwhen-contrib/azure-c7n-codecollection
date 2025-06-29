@@ -11,7 +11,8 @@ Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
 Library    CloudCustodian.Core
-
+Library    OperatingSystem
+Library    Collections
 Suite Setup         Suite Initialization
 
 
@@ -33,7 +34,7 @@ Check Azure Storage Resource Health in resource group `${AZURE_RESOURCE_GROUP}`
         Log    Failed to load JSON payload, defaulting to empty list.    WARN
         ${health_list}=    Create List
     END
-    IF    len(@{health_list}) > 0
+    IF    $health_list
 
         FOR    ${health}    IN    @{health_list}
             ${pretty_health}=    Evaluate    pprint.pformat(${health})    modules=pprint
@@ -79,7 +80,7 @@ List Unused Azure Disks in resource group `${AZURE_RESOURCE_GROUP}`
         ${disk_list}=    Create List
     END
 
-    IF    len(@{disk_list}) > 0
+    IF    $disk_list
         ${formatted_results}=    RW.CLI.Run Cli
         ...    cmd=jq -r '["Disk_Name", "Resource_Group", "Location", "Size_GB", "Disk_Link"], (.[] | [ .name, (.resourceGroup | ascii_downcase), .location, .properties.diskSizeGB, ("https://portal.azure.com/#@/resource" + .id + "/overview") ]) | @tsv' ${OUTPUT_DIR}/azure-c7n-disk-triage/unused-disk/resources.json | column -t
         RW.Core.Add Pre To Report    Unused Disks Summary:\n========================\n${formatted_results.stdout}
@@ -120,7 +121,7 @@ List Unused Azure Snapshots in resource group `${AZURE_RESOURCE_GROUP}`
         ${snapshot_list}=    Create List
     END
 
-    IF    len(@{snapshot_list}) > 0
+    IF    $snapshot_list
         ${formatted_results}=    RW.CLI.Run Cli
         ...    cmd=jq -r '["Snapshot_Name", "Resource_Group", "Location", "Size_GB", "Snapshot_Link"], (.[] | [ .name, (.resourceGroup | ascii_downcase), .location, .properties.diskSizeGB, ("https://portal.azure.com/#@/resource" + .id + "/overview") ]) | @tsv' ${OUTPUT_DIR}/azure-c7n-snapshot-triage/unused-snapshot/resources.json | column -t
         RW.Core.Add Pre To Report    Unused Snapshots Summary:\n========================\n${formatted_results.stdout}
@@ -162,7 +163,7 @@ List Unused Azure Storage Accounts in resource group `${AZURE_RESOURCE_GROUP}`
         ${storage_list}=    Create List
     END
 
-    IF    len(@{storage_list}) > 0
+    IF    $storage_list
         ${formatted_results}=    RW.CLI.Run Cli
         ...    cmd=jq -r '["Storage_Name", "Resource_Group", "Location", "Transactions", "Storage_Link"], (.[] | [ .name, (.resourceGroup | ascii_downcase), .location, (."c7n:metrics" | to_entries | map(.value.measurement[0]) | first // 0 | tonumber | (. * 100 | round / 100) | tostring), ("https://portal.azure.com/#@/resource" + .id + "/overview") ]) | @tsv' ${OUTPUT_DIR}/azure-c7n-storage-triage/unused-storage-account/resources.json | column -t
         RW.Core.Add Pre To Report    Unused Storage Accounts Summary:\n========================\n${formatted_results.stdout}
@@ -203,7 +204,7 @@ List Storage Containers with Public Access in resource group `${AZURE_RESOURCE_G
         ${container_list}=    Create List
     END
 
-    IF    len(@{container_list}) > 0
+    IF    $container_list
         ${formatted_results}=    RW.CLI.Run Cli
         ...    cmd=jq -r '["Container_Name","Storage_Account","Resource_Group","Public_Access_Level","Container_Link"], (.[] | [ .name,(.id | split("/") | .[8] // ""), (.resourceGroup | ascii_downcase), (.properties.publicAccess), ("https://portal.azure.com/#@/resource" + .id + "/overview") ]) | @tsv' azure-c7n-storage-containers-public-access/storage-container-public/resources.json | column -s $'\t' -t 
         RW.Core.Add Pre To Report    Public Accessible Storage Containers Summary:\n========================\n${formatted_results.stdout}
@@ -224,12 +225,100 @@ List Storage Containers with Public Access in resource group `${AZURE_RESOURCE_G
             ...    actual=Azure storage container `${container_name}` has public access level '${public_access}' (${access_description}) in resource group `${resource_group}`
             ...    title=Public Accessible Azure Storage Container `${container_name}` found in Resource Group `${resource_group}`
             ...    reproduce_hint=${c7n_output.cmd}
-            ...    details=${pretty_container}
             ...    next_steps=Restrict public access to the storage container to improve security in resource group `${resource_group}`.
         END
     ELSE
         RW.Core.Add Pre To Report    "No public accessible storage containers found in resource group `${AZURE_RESOURCE_GROUP}`"
     END
+
+List Storage accounts miss configuration in resource group `${AZURE_RESOURCE_GROUP}`
+    [Documentation]    Identify Azure storage accounts with security or configuration misconfigurations
+    [Tags]    Storage    Azure    Security    Configuration    access:read-only
+
+    # Execute the helper script that generates `storage_misconfig.json`
+    ${misconfig_cmd}=    RW.CLI.Run Bash File
+    ...    bash_file=storage-misconfig.sh
+    ...    env=${env}
+    ...    timeout_seconds=300
+    ...    include_in_history=false
+
+    ${log_file}=    Set Variable    storage_misconfig.json
+    ${misconfig_output}=    RW.CLI.Run Cli
+    ...    cmd=cat ${log_file}
+    # Load JSON results.  If the file is missing or malformed, report an issue and abort.
+    TRY
+        ${data}=    Evaluate    json.loads('''${misconfig_output.stdout}''')    json
+    EXCEPT    Exception as e
+        Log    Failed to load JSON payload, defaulting to empty result set. Error: ${str(e)}    WARN
+        ${data}=    Create Dictionary    storage_accounts=[]
+    END
+
+    ${accounts}=    Set Variable    ${data.get('storage_accounts', [])}
+
+    IF    $accounts
+        FOR    ${acct}    IN    @{accounts}
+            ${acct_name}=    Set Variable    ${acct['name']}
+            ${acct_url}=    Set Variable    ${acct.get('resource_url', 'N/A')}
+            ${issues}=    Set Variable    ${acct.get('issues', [])}
+            ${acct_pretty}=    Evaluate    json.dumps(${acct.get('details', {})}, indent=2)
+            
+            # Skip if no issues
+            IF    not ${issues}
+                CONTINUE
+            END
+            
+            # Prepare combined issue details
+            ${issue_descriptions}=    Create List
+            ${next_steps_list}=    Create List
+            
+            FOR    ${issue}    IN    @{issues}
+                ${issue_details}=    Catenate    SEPARATOR=\n\n
+                ...    Issue: ${issue.get('title', 'Misconfiguration')}
+                ...    Reason: ${issue.get('reason', 'No reason provided')}
+                
+                ${step}=    Set Variable    ${issue.get('next_step', 'Review and remediate this misconfiguration.')}
+                Append To List    ${next_steps_list}    ${step}
+                
+                Append To List    ${issue_descriptions}    ${issue_details}
+            END
+            
+            # Build tabular misconfiguration list using jq and column
+            ${issues_json}=    Evaluate    json.dumps(${issues})    json
+            ${issues_table}=    RW.CLI.Run Cli
+            ...    cmd=echo '${issues_json}' | jq -r '"Issue\tReason", "----------\t-----------", (.[] | [.title, (.reason // "No reason provided")] | @tsv)' | column -s "\t" -t
+            ${combined_issues}=    Set Variable    ${issues_table.stdout}
+
+            # Combine all next steps into a single multiline string
+            ${combined_next_steps}=    Evaluate    '\\n'.join(${next_steps_list})
+
+            # Get issue count
+            ${issue_count}=    Get Length    ${issues}
+            RW.Core.Add Pre To Report    \nMisconfigurations in storage account ${acct_name}:\n====================================================\n${combined_issues}
+            # Create a single issue for this storage account
+            RW.Core.Add Issue
+            ...    severity=4
+            ...    expected=Storage account `${acct_name}` should not have security misconfigurations in resource group `${AZURE_RESOURCE_GROUP}`
+            ...    actual=Found ${issue_count} misconfiguration(s) in storage account `${acct_name}` in resource group `${AZURE_RESOURCE_GROUP}`
+            ...    title=Azure Storage Misconfiguration found in ${acct_name} in resource group `${AZURE_RESOURCE_GROUP}`
+            ...    reproduce_hint=${misconfig_cmd.cmd}
+            ...    next_steps=${combined_next_steps}
+            ...    details=${acct_pretty}
+        END
+
+        # Calculate overall totals
+        ${total_issues}=    Set Variable    0
+        ${EMPTY_LIST}=    Create List
+        FOR    ${acct}    IN    @{accounts}
+            ${issues}=    Get From Dictionary    ${acct}    issues    ${EMPTY_LIST}
+            ${cnt}=    Get Length    ${issues}
+            ${total_issues}=    Evaluate    ${total_issues} + ${cnt}
+        END
+        ${account_count}=    Get Length    ${accounts}
+        RW.Core.Add Pre To Report    Detected ${total_issues} misconfiguration(s) across ${account_count} storage account(s) in resource group `${AZURE_RESOURCE_GROUP}`
+    ELSE
+        RW.Core.Add Pre To Report    "No storage account misconfigurations found in resource group `${AZURE_RESOURCE_GROUP}`"
+    END
+
 
 *** Keywords ***
 Suite Initialization
