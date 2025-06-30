@@ -136,7 +136,7 @@ resource "azurerm_linux_virtual_machine" "vm-no-agent" {
   location            = azurerm_resource_group.rg.location
   size                = "Standard_DS1_v2"
   admin_username      = "adminuser"
-  
+
   # Disable VM agent
   disable_password_authentication = true
   admin_ssh_key {

@@ -14,10 +14,10 @@ policies:
         value_type: swap
         value: ProvisioningState/Unavailable
       - type: metric
-        metric: Available Memory Bytes
-        op: lt
+        metric: {% if memory_percentage is defined %}Available Memory Percentage{% else %}Available Memory Bytes{% endif %}
+        op: {% if op is defined %}{{op}}{% else %}lt{% endif %}
         aggregation: average
-        threshold: {{memory_threshold}}
+        threshold: {% if memory_percentage is defined %}{{memory_percentage}}{% else %}{{memory_threshold}}{% endif %}
         timeframe: {{timeframe}}
       - type: value
         key: resourceGroup

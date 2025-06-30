@@ -4,7 +4,7 @@ policies:
     subscription: {{subscriptionId}}
     filters:
       - type: value
-        key: properties.networkProfile.networkInterfaces[0].properties.ipConfigurations[0].properties.publicIPAddress
+        key: properties.networkProfile.networkInterfaces[].properties.ipConfigurations[].properties.publicIPAddress.id
         value: not-null
       - type: value
         key: resourceGroup

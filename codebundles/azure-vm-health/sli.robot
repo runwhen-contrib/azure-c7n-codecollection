@@ -200,6 +200,7 @@ Check for Underutilized VMs Based on Memory Usage in resource group `${AZURE_RES
     [Tags]    VM    Azure    Memory    Utilization    access:read-only
     CloudCustodian.Core.Generate Policy   
     ...    ${CURDIR}/vm-memory-usage.j2
+    ...    op=gt
     ...    memory_percentage=${LOW_MEMORY_PERCENTAGE}
     ...    timeframe=${LOW_MEMORY_TIMEFRAME}
     ...    resourceGroup=${AZURE_RESOURCE_GROUP}
