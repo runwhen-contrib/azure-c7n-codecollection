@@ -1,5 +1,5 @@
 policies:
-  - name: unused-public-ip
+  - name: unused-publicip
     resource: azure.publicip
     filters:
       - type: value
@@ -8,4 +8,4 @@ policies:
       - type: value
         key: resourceGroup
         op: eq
-        value: {{resourceGroup|upper}}
+        value: {{resourceGroup}}

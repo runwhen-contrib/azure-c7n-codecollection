@@ -7,3 +7,5 @@ policies:
         value: not-null
       - type: value
         key: resourceGroup
+        op: eq
+        value: {{resourceGroup|upper}}
