@@ -3,9 +3,9 @@ policies:
     resource: azure.snapshot
     filters:
       - and:
-        - type: value
-          key: managedBy
-          value: null
+      - type: value
+        key: managedBy
+        value: null
         - type: value
           key: properties.diskState
           value: "Unattached"

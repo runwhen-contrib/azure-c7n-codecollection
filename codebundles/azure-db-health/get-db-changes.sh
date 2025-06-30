@@ -60,6 +60,9 @@ for db_type in $db_types; do
         "azure.mysql-flexibleserver")
             instances=$(az mysql flexible-server list -g "$AZURE_RESOURCE_GROUP" --query "[].id" -o tsv)
             ;;
+        "azure.postgresql-flexibleserver")
+            instances=$(az postgres flexible-server list -g "$AZURE_RESOURCE_GROUP" --query "[].id" -o tsv)
+            ;;
         "azure.sql-database")
             # For SQL databases, we need to get servers first, then databases
             servers=$(az sql server list -g "$AZURE_RESOURCE_GROUP" --query "[].name" -o tsv)
@@ -178,9 +181,14 @@ echo "Database changes retrieved and saved to: $CHANGES_OUTPUT"
 total_changes=$(jq 'length' "$CHANGES_OUTPUT")
 echo "Total changes found: $total_changes"
 
-jq 'group_by(.dbName) | 
-    map({ (.[0].dbName): . }) | 
-    add' "$CHANGES_OUTPUT" > db_changes_grouped.json
+# Group by database name and handle empty case
+if [ "$total_changes" -eq 0 ]; then
+    echo "{}" > db_changes_grouped.json
+else
+    jq 'group_by(.dbName) | 
+        map({ (.[0].dbName): . }) | 
+        add' "$CHANGES_OUTPUT" > db_changes_grouped.json
+fi
 
 rm -rf $CHANGES_OUTPUT
 # # If there are many changes, suggest filtering

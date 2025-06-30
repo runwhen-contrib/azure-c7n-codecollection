@@ -22,3 +22,4 @@ spec:
             - type: sli
             - type: runbook
               templateName: azure-storage-health-taskset.yaml
+            - type: workflow

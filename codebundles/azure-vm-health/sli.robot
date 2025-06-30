@@ -45,7 +45,8 @@ Check for VMs With Public IP in resource group `${AZURE_RESOURCE_GROUP}`
     [Tags]    VM    Azure    Network    Security    access:read-only 
     CloudCustodian.Core.Generate Policy   
     ...    ${CURDIR}/vm-with-public-ip.j2
-    ...    resourceGroup=${AZURE_RESOURCE_GROUP}   
+    ...    resourceGroup=${AZURE_RESOURCE_GROUP}
+    ...    subscriptionId=${AZURE_SUBSCRIPTION_ID}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/vm-with-public-ip.yaml --cache-period 0
     ${count}=    RW.CLI.Run Cli
@@ -60,6 +61,7 @@ Check for Stopped VMs in resource group `${AZURE_RESOURCE_GROUP}`
     ...    ${CURDIR}/stopped-vm.j2
     ...    timeframe=${STOPPED_VM_TIMEFRAME}
     ...    resourceGroup=${AZURE_RESOURCE_GROUP}
+    ...    subscriptionId=${AZURE_SUBSCRIPTION_ID}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/stopped-vm.yaml --cache-period 0
     ${count}=    RW.CLI.Run Cli
@@ -116,6 +118,7 @@ Check for Underutilized VMs Based on CPU Usage in resource group `${AZURE_RESOUR
     ...    cpu_percentage=${LOW_CPU_PERCENTAGE}
     ...    timeframe=${LOW_CPU_TIMEFRAME}
     ...    resourceGroup=${AZURE_RESOURCE_GROUP}
+    ...    subscriptionId=${AZURE_SUBSCRIPTION_ID}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/under-utilized-vm-cpu-usage.yaml --cache-period 0
     ${report_data}=    RW.CLI.Run Cli
@@ -154,9 +157,10 @@ Check for VMs With High Memory Usage in resource group `${AZURE_RESOURCE_GROUP}`
     [Tags]    VM    Azure    Memory    Performance    access:read-only
     CloudCustodian.Core.Generate Policy   
     ...    ${CURDIR}/vm-memory-usage.j2
-    ...    memory_percentage=${HIGH_MEMORY_PERCENTAGE}
+    ...    memory_threshold=${HIGH_MEMORY_THRESHOLD}
     ...    timeframe=${HIGH_MEMORY_TIMEFRAME}
     ...    resourceGroup=${AZURE_RESOURCE_GROUP}
+    ...    subscriptionId=${AZURE_SUBSCRIPTION_ID}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/vm-memory-usage.yaml --cache-period 0
     ${report_data}=    RW.CLI.Run Cli
@@ -196,9 +200,11 @@ Check for Underutilized VMs Based on Memory Usage in resource group `${AZURE_RES
     [Tags]    VM    Azure    Memory    Utilization    access:read-only
     CloudCustodian.Core.Generate Policy   
     ...    ${CURDIR}/vm-memory-usage.j2
+    ...    op=gt
     ...    memory_percentage=${LOW_MEMORY_PERCENTAGE}
     ...    timeframe=${LOW_MEMORY_TIMEFRAME}
     ...    resourceGroup=${AZURE_RESOURCE_GROUP}
+    ...    subscriptionId=${AZURE_SUBSCRIPTION_ID}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/vm-memory-usage.yaml --cache-period 0
     ${report_data}=    RW.CLI.Run Cli
@@ -239,6 +245,7 @@ Check for Unused Network Interfaces in resource group `${AZURE_RESOURCE_GROUP}`
     CloudCustodian.Core.Generate Policy   
     ...    ${CURDIR}/unused-nic.j2
     ...    resourceGroup=${AZURE_RESOURCE_GROUP}
+    ...    subscriptionId=${AZURE_SUBSCRIPTION_ID}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/unused-nic.yaml --cache-period 0
     ${count}=    RW.CLI.Run Cli
@@ -253,6 +260,7 @@ Check for Unused Public IPs in resource group `${AZURE_RESOURCE_GROUP}`
     CloudCustodian.Core.Generate Policy   
     ...    ${CURDIR}/unused-public-ip.j2
     ...    resourceGroup=${AZURE_RESOURCE_GROUP}
+    ...    subscriptionId=${AZURE_SUBSCRIPTION_ID}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/unused-public-ip.yaml --cache-period 0
     ${count}=    RW.CLI.Run Cli
@@ -266,6 +274,7 @@ Check VMs Agent Status in resource group `${AZURE_RESOURCE_GROUP}`
     CloudCustodian.Core.Generate Policy
     ...    vm-agent-status.j2
     ...    resourceGroup=${AZURE_RESOURCE_GROUP}
+    ...    subscriptionId=${AZURE_SUBSCRIPTION_ID}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s azure-c7n-vm-health vm-agent-status.yaml --cache-period 0
     ${count}=    RW.CLI.Run Cli
@@ -320,6 +329,12 @@ Suite Initialization
     ...    pattern=^\d+$
     ...    example=24
     ...    default=24
+    ${HIGH_MEMORY_THRESHOLD}=    RW.Core.Import User Variable    HIGH_MEMORY_THRESHOLD
+    ...    type=string
+    ...    description=The memory threshold in bytes to check for high memory usage.
+    ...    pattern=^\d+$
+    ...    example=1073741824
+    ...    default=1073741824
     ${MAX_VM_WITH_PUBLIC_IP}=    RW.Core.Import User Variable    MAX_VM_WITH_PUBLIC_IP
     ...    type=string
     ...    description=The maximum number of VMs with public IP addresses to allow.
@@ -417,12 +432,19 @@ Suite Initialization
     Set Suite Variable    ${STOPPED_VM_TIMEFRAME}    ${STOPPED_VM_TIMEFRAME}
     Set Suite Variable    ${HIGH_MEMORY_PERCENTAGE}    ${HIGH_MEMORY_PERCENTAGE}
     Set Suite Variable    ${HIGH_MEMORY_TIMEFRAME}    ${HIGH_MEMORY_TIMEFRAME}
+    Set Suite Variable    ${HIGH_MEMORY_THRESHOLD}    ${HIGH_MEMORY_THRESHOLD}
     Set Suite Variable    ${LOW_MEMORY_PERCENTAGE}    ${LOW_MEMORY_PERCENTAGE}
     Set Suite Variable    ${LOW_MEMORY_TIMEFRAME}    ${LOW_MEMORY_TIMEFRAME}
     Set Suite Variable    ${MAX_UNDERUTILIZED_VM_MEMORY}    ${MAX_UNDERUTILIZED_VM_MEMORY}
     Set Suite Variable    ${MAX_UNUSED_NIC}    ${MAX_UNUSED_NIC}
     Set Suite Variable    ${MAX_UNUSED_PUBLIC_IP}    ${MAX_UNUSED_PUBLIC_IP}
     Set Suite Variable    ${MAX_VM_AGENT_STATUS}    ${MAX_VM_AGENT_STATUS}
+    
+    # Set Azure subscription context for Cloud Custodian
+    RW.CLI.Run Cli
+    ...    cmd=az account set --subscription ${AZURE_SUBSCRIPTION_ID}
+    ...    include_in_history=false
+    
     Set Suite Variable
     ...    ${env}
     ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}"}

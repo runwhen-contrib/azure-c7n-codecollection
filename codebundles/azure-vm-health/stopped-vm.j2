@@ -8,7 +8,6 @@ policies:
         op: in
         value_type: swap
         value: PowerState/deallocated
-
       # 2. Ensure the VM has had 0% CPU usage since {{timeframe}}
       - type: metric
         metric: Percentage CPU
@@ -16,7 +15,6 @@ policies:
         aggregation: average
         threshold: 0
         timeframe: {{timeframe}} 
-
       - type: value
         key: resourceGroup
         op: eq

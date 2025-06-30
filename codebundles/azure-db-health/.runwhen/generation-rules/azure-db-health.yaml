@@ -25,3 +25,4 @@ spec:
             - type: sli
             - type: runbook
               templateName: azure-db-health-taskset.yaml
+            - type: workflow
