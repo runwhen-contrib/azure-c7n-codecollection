@@ -3,11 +3,14 @@ policies:
     description: |
       Find all containers with public access enabled
     resource: azure.storage-container
+    subscription: {{subscriptionId}}
     filters:
       - type: value
         key: properties.publicAccess
-        op: not-equal
-        value: None   # Possible values: Blob, Container, None
+        op: in
+        value:
+          - Container
+          - Blob
       - type: value
         key: resourceGroup
         op: eq

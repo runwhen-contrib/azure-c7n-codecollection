@@ -9,6 +9,16 @@
         "cpu_metric": "cpu_percent",
         "provider_path": "Microsoft.DBforMySQL/flexibleServers"
     },
+    "postgresql-flexibleserver": {
+        "resource": "azure.postgresql-flexibleserver",
+        "display_name": "PostgreSQL Flexible Server",
+        "publicnetworkaccess": "properties.network.publicNetworkAccess",
+        "ha": {"key": "properties.highAvailability.mode", "value": "Disabled"},
+        "replication": {"key": "properties.replicationRole", "value": "None"},
+        "memory_metric": "memory_percent",
+        "cpu_metric": "cpu_percent",
+        "provider_path": "Microsoft.DBforPostgreSQL/flexibleServers"
+    },
     "sql-database": {
         "resource": "azure.sql-database",
         "display_name": "SQL Database",

@@ -1,6 +1,7 @@
 policies:
   - name: stopped-vms
     resource: azure.vm
+    subscription: {{subscriptionId}}
     filters:
       # 1. List only VMs that are stopped (deallocated)
       - type: instance-view

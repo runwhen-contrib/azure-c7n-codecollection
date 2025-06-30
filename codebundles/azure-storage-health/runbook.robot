@@ -13,6 +13,7 @@ Library             RW.platform
 Library    CloudCustodian.Core
 Library    OperatingSystem
 Library    Collections
+Library    DateTime
 Suite Setup         Suite Initialization
 
 
@@ -68,6 +69,7 @@ List Unused Azure Disks in resource group `${AZURE_RESOURCE_GROUP}`
     CloudCustodian.Core.Generate Policy   
     ...    ${CURDIR}/unused-disk.j2
     ...    resourceGroup=${AZURE_RESOURCE_GROUP}
+    ...    subscriptionId=${AZURE_SUBSCRIPTION_ID}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-disk-triage ${CURDIR}/unused-disk.yaml --cache-period 0
     ${report_data}=    RW.CLI.Run Cli
@@ -109,6 +111,7 @@ List Unused Azure Snapshots in resource group `${AZURE_RESOURCE_GROUP}`
     CloudCustodian.Core.Generate Policy   
     ...    ${CURDIR}/unused-snapshot.j2
     ...    resourceGroup=${AZURE_RESOURCE_GROUP}
+    ...    subscriptionId=${AZURE_SUBSCRIPTION_ID}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-snapshot-triage ${CURDIR}/unused-snapshot.yaml --cache-period 0
     ${report_data}=    RW.CLI.Run Cli
@@ -151,6 +154,7 @@ List Unused Azure Storage Accounts in resource group `${AZURE_RESOURCE_GROUP}`
     ...    ${CURDIR}/unused-storage-account.j2
     ...    timeframe=${UNUSED_STORAGE_ACCOUNT_TIMEFRAME}
     ...    resourceGroup=${AZURE_RESOURCE_GROUP}
+    ...    subscriptionId=${AZURE_SUBSCRIPTION_ID}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-storage-triage ${CURDIR}/unused-storage-account.yaml --cache-period 0
     ${report_data}=    RW.CLI.Run Cli
@@ -179,13 +183,11 @@ List Unused Azure Storage Accounts in resource group `${AZURE_RESOURCE_GROUP}`
             ...    title=Unused Azure Storage Account `${storage_name}` found in Resource Group `${resource_group}` 
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details=${pretty_storage}
-            ...    next_steps=Delete the unused storage account to reduce storage costs in resource group ``${resource_group}` 
+            ...    next_steps=Delete the unused storage account to reduce storage costs in resource group `${resource_group}`
         END
     ELSE
         RW.Core.Add Pre To Report    "No unused storage accounts found in resource group `${AZURE_RESOURCE_GROUP}`"
     END
-
-
 
 List Storage Containers with Public Access in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    List Azure storage containers with public access enabled
@@ -193,6 +195,7 @@ List Storage Containers with Public Access in resource group `${AZURE_RESOURCE_G
     CloudCustodian.Core.Generate Policy   
     ...    stg-containers-with-public-access.j2
     ...    resourceGroup=${AZURE_RESOURCE_GROUP}
+    ...    subscriptionId=${AZURE_SUBSCRIPTION_ID}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s azure-c7n-storage-containers-public-access stg-containers-with-public-access.yaml --cache-period 0
     ${report_data}=    RW.CLI.Run Cli
@@ -231,7 +234,7 @@ List Storage Containers with Public Access in resource group `${AZURE_RESOURCE_G
         RW.Core.Add Pre To Report    "No public accessible storage containers found in resource group `${AZURE_RESOURCE_GROUP}`"
     END
 
-List Storage accounts miss configuration in resource group `${AZURE_RESOURCE_GROUP}`
+List Storage Account Misconfigurations in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Identify Azure storage accounts with security or configuration misconfigurations
     [Tags]    Storage    Azure    Security    Configuration    access:read-only
 
@@ -319,6 +322,136 @@ List Storage accounts miss configuration in resource group `${AZURE_RESOURCE_GRO
         RW.Core.Add Pre To Report    "No storage account misconfigurations found in resource group `${AZURE_RESOURCE_GROUP}`"
     END
 
+List Storage Account Changes in resource group `${AZURE_RESOURCE_GROUP}`
+    [Documentation]    Lists storage account changes and operations from Azure Activity Log
+    [Tags]    Storage    Azure    Audit    Security    access:read-only
+    
+    ${success_file}=    Set Variable    stg_changes_success.json
+    ${failed_file}=    Set Variable    stg_changes_failed.json
+    
+    ${audit_cmd}=    RW.CLI.Run Bash File
+    ...    bash_file=stg-audit.sh
+    ...    env=${env}
+    ...    timeout_seconds=300
+    ...    include_in_history=false
+    ...    show_in_rwl_cheatsheet=true
+    
+    # Process successful operations
+    ${success_data}=    RW.CLI.Run Cli
+    ...    cmd=cat ${success_file}
+    TRY
+        ${success_changes}=    Evaluate    json.loads(r'''${success_data.stdout}''')    json
+    EXCEPT
+        Log    Failed to load successful changes JSON, defaulting to empty dict.    WARN
+        ${success_changes}=    Create Dictionary
+    END
+
+    # Process failed operations
+    ${failed_data}=    RW.CLI.Run Cli
+    ...    cmd=cat ${failed_file}
+    TRY
+        ${failed_changes}=    Evaluate    json.loads(r'''${failed_data.stdout}''')    json
+    EXCEPT
+        Log    Failed to load failed changes JSON, defaulting to empty dict.    WARN
+        ${failed_changes}=    Create Dictionary
+    END
+
+    # Process successful changes
+    IF    len(${success_changes}) > 0
+        FOR    ${stg_name}    IN    @{success_changes.keys()}
+            ${stg_changes}=    Set Variable    ${success_changes["${stg_name}"]}
+            
+            # Skip if no changes for this storage account
+            IF    len(@{stg_changes}) == 0
+                CONTINUE
+            END
+            
+            # Format changes for this storage account
+            ${stg_changes_json}=    Evaluate    json.dumps(${stg_changes})    json
+            ${formatted_results}=    RW.CLI.Run Cli
+            ...    cmd=printf '%s' '${stg_changes_json}' | jq -r '["Operation", "Timestamp", "Caller", "Security_Level", "Reason"] as $headers | [$headers] + [.[] | [.operation, .timestamp, .caller, .security_classification, .reason]] | .[] | @tsv' | column -t -s $'\t'
+            RW.Core.Add Pre To Report    Successful Changes for Storage Account (${stg_name}):\n-------------------------------------------------------\n${formatted_results.stdout}\n
+            
+            # Raise issues for changes based on security classification
+            FOR    ${change}    IN    @{stg_changes}
+                ${pretty_change}=    Evaluate    pprint.pformat(${change})    modules=pprint
+                ${operation}=    Set Variable    ${change['operation']}
+                ${caller}=    Set Variable    ${change['caller']}
+                ${timestamp}=    Set Variable    ${change['timestamp']}
+                ${security_level}=    Set Variable    ${change['security_classification']}
+                ${reason}=    Set Variable    ${change['reason']}
+                ${resource_url}=    Set Variable    ${change['resourceUrl']}
+                
+                # Map security classification to severity
+                ${severity}=    Set Variable If
+                ...    '${security_level}' == 'Critical'    3
+                ...    '${security_level}' == 'High'        3
+                ...    '${security_level}' == 'Medium'      4
+                ...    4
+                
+                # Add portal URL to details
+                ${enhanced_details}=    Set Variable    ${pretty_change}\n\nAzure Portal Link: ${resource_url}
+                
+                RW.Core.Add Issue
+                ...    severity=${severity}
+                ...    expected=Storage account operations should be reviewed for security implications in resource group `${AZURE_RESOURCE_GROUP}`
+                ...    actual=${security_level.lower()} security operation detected: ${operation} by ${caller} at ${timestamp} on storage account `${stg_name}`
+                ...    title=Storage Account Change - ${security_level} Security: ${operation} on `${stg_name}` in Resource Group `${AZURE_RESOURCE_GROUP}`
+                ...    details=${enhanced_details}
+                ...    reproduce_hint=${audit_cmd.cmd}
+                ...    next_steps=Review the operation for security implications. Reason: ${reason}
+            END
+        END
+    ELSE
+        RW.Core.Add Pre To Report    No successful storage account changes found in resource group `${AZURE_RESOURCE_GROUP}` within the specified timeframe
+    END
+
+    # Process failed changes
+    IF    len(${failed_changes}) > 0
+        FOR    ${stg_name}    IN    @{failed_changes.keys()}
+            ${stg_changes}=    Set Variable    ${failed_changes["${stg_name}"]}
+            
+            # Skip if no changes for this storage account
+            IF    len(@{stg_changes}) == 0
+                CONTINUE
+            END
+            
+            # Format changes for this storage account
+            ${stg_changes_json}=    Evaluate    json.dumps(${stg_changes})    json
+            ${formatted_results}=    RW.CLI.Run Cli
+            ...    cmd=printf '%s' '${stg_changes_json}' | jq -r '["Operation", "Timestamp", "Caller", "Security_Level", "Reason"] as $headers | [$headers] + [.[] | [.operation, .timestamp, .caller, .security_classification, .reason]] | .[] | @tsv' | column -t -s $'\t'
+            RW.Core.Add Pre To Report    Failed Changes for Storage Account (${stg_name}):\n-----------------------------------------------------\n${formatted_results.stdout}\n
+            
+            # Raise issues for changes based on security classification
+            FOR    ${change}    IN    @{stg_changes}
+                ${pretty_change}=    Evaluate    pprint.pformat(${change})    modules=pprint
+                ${operation}=    Set Variable    ${change['operation']}
+                ${caller}=    Set Variable    ${change['caller']}
+                ${timestamp}=    Set Variable    ${change['timestamp']}
+                ${security_level}=    Set Variable    ${change['security_classification']}
+                ${reason}=    Set Variable    ${change['reason']}
+                ${resource_url}=    Set Variable    ${change['resourceUrl']}
+                
+                # Add portal URL to details
+                ${enhanced_details}=    Set Variable    ${pretty_change}\n\nAzure Portal Link: ${resource_url}
+                
+                RW.Core.Add Issue
+                ...    severity=4
+                ...    expected=Storage account operations should complete successfully in resource group `${AZURE_RESOURCE_GROUP}`
+                ...    actual=Failed operation detected: ${operation} by ${caller} at ${timestamp} on storage account `${stg_name}`
+                ...    title=Storage Account Failed Operation: ${operation} on `${stg_name}` in Resource Group `${AZURE_RESOURCE_GROUP}`
+                ...    details=${enhanced_details}
+                ...    reproduce_hint=${audit_cmd.cmd}
+                ...    next_steps=Investigate the failed operation. Reason: ${reason}
+            END
+        END
+    ELSE
+        RW.Core.Add Pre To Report    No failed storage account changes found in resource group `${AZURE_RESOURCE_GROUP}` within the specified timeframe
+    END
+    
+    # Clean up temporary files
+    RW.CLI.Run Cli    cmd=rm -f ${success_file} ${failed_file}
+
 
 *** Keywords ***
 Suite Initialization
@@ -341,9 +474,16 @@ Suite Initialization
     ...    description=The timeframe in hours to check for unused storage accounts (e.g., 720 for 30 days)
     ...    pattern=\d+
     ...    default=24
+    ${AZURE_ACTIVITY_LOG_OFFSET}=    RW.Core.Import User Variable    AZURE_ACTIVITY_LOG_OFFSET
+    ...    type=string
+    ...    description=The time offset to check for activity logs in this formats 24h, 1h, 1d etc.
+    ...    pattern=^\w+$
+    ...    example=24h
+    ...    default=24h
     Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}    ${AZURE_SUBSCRIPTION_ID}
     Set Suite Variable    ${AZURE_RESOURCE_GROUP}    ${AZURE_RESOURCE_GROUP}
     Set Suite Variable    ${UNUSED_STORAGE_ACCOUNT_TIMEFRAME}    ${UNUSED_STORAGE_ACCOUNT_TIMEFRAME}
+    Set Suite Variable    ${AZURE_ACTIVITY_LOG_OFFSET}    ${AZURE_ACTIVITY_LOG_OFFSET}
     Set Suite Variable
     ...    ${env}
-    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}"}
+    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}", "AZURE_ACTIVITY_LOG_OFFSET":"${AZURE_ACTIVITY_LOG_OFFSET}"}

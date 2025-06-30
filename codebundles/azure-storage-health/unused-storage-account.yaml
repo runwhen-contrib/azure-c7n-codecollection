@@ -1,15 +1,15 @@
 policies:
   - name: unused-storage-account
     resource: azure.storage
-    subscription: {{subscriptionId}}
+    subscription: 2a0cf760-baef-4446-b75c-75c4f8a6267f
     filters:
       - type: metric
         metric: Transactions
         op: equal
         threshold: 0
-        timeframe: {{timeframe}}
+        timeframe: 24
         aggregation: total
       - type: value
         key: resourceGroup
         op: eq
-        value: {{resourceGroup}}
+        value: sandbox-contoso-rg

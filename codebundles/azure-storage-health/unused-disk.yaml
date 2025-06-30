@@ -1,7 +1,10 @@
+vars:
+  subscription_id: {{ subscription_id }}
+
 policies:
-  - name: unused-snapshot
-    resource: azure.snapshot
-    subscription: {{subscriptionId}}
+  - name: unused-disk
+    resource: azure.disk
+    subscription: 2a0cf760-baef-4446-b75c-75c4f8a6267f
     filters:
       - and:
         - type: value
@@ -13,4 +16,4 @@ policies:
       - type: value
         key: resourceGroup
         op: eq
-        value: {{resourceGroup|upper}}
+        value: SANDBOX-CONTOSO-RG

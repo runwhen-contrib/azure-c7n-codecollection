@@ -14,16 +14,16 @@ fi
 
 # Check if Microsoft.ResourceHealth provider is registered
 echo "Checking registration status of Microsoft.ResourceHealth provider..."
-registrationState=$(az provider show --namespace Microsoft.ResourceHealth --query "registrationState" -o tsv)
+registrationState=$(az provider show --namespace Microsoft.ResourceHealth --subscription "$subscription" --query "registrationState" -o tsv)
 
 if [[ "$registrationState" != "Registered" ]]; then
     echo "Registering Microsoft.ResourceHealth provider..."
-    az provider register --namespace Microsoft.ResourceHealth
+    az provider register --namespace Microsoft.ResourceHealth --subscription "$subscription"
 
     # Wait for registration
     echo "Waiting for Microsoft.ResourceHealth provider to register..."
     for i in {1..10}; do
-        registrationState=$(az provider show --namespace Microsoft.ResourceHealth --query "registrationState" -o tsv)
+        registrationState=$(az provider show --namespace Microsoft.ResourceHealth --subscription "$subscription" --query "registrationState" -o tsv)
         if [[ "$registrationState" == "Registered" ]]; then
             echo "Microsoft.ResourceHealth provider registered successfully."
             break
@@ -42,14 +42,40 @@ else
     echo "Microsoft.ResourceHealth provider is already registered."
 fi
 
+# Check required environment variables
+if [ -z "$AZURE_RESOURCE_GROUP" ]; then
+    echo "Error: AZURE_RESOURCE_GROUP environment variable must be set."
+    exit 1
+fi
+
+# Validate resource group exists in the current subscription
+echo "Validating resource group '$AZURE_RESOURCE_GROUP' exists in subscription '$subscription'..."
+resource_group_exists=$(az group show --name "$AZURE_RESOURCE_GROUP" --subscription "$subscription" --query "name" -o tsv 2>/dev/null)
+
+if [ -z "$resource_group_exists" ]; then
+    echo "ERROR: Resource group '$AZURE_RESOURCE_GROUP' was not found in subscription '$subscription'."
+    echo ""
+    echo "Available resource groups in subscription '$subscription':"
+    az group list --subscription "$subscription" --query "[].name" -o tsv | sort
+    echo ""
+    echo "Please verify:"
+    echo "1. The resource group name is correct"
+    echo "2. You have access to the resource group"
+    echo "3. You're using the correct subscription"
+    echo "4. The resource group exists in this subscription"
+    exit 1
+fi
+
+echo "Resource group '$AZURE_RESOURCE_GROUP' validated successfully."
+
 # Define provider path for virtual machines
 provider_path="Microsoft.Compute/virtualMachines"
 display_name="Azure Virtual Machine"
 
 echo "Processing resource type: virtual-machine ($display_name)"
 
-# Get list of all VMs across all resource groups
-instances=$(az vm list --query "[].{name:name, resourceGroup:resourceGroup}" -o tsv | sort -u)
+# Get list of VMs in the specific resource group
+instances=$(az vm list -g "$AZURE_RESOURCE_GROUP" --subscription "$subscription" --query "[].{name:name, resourceGroup:resourceGroup}" -o tsv | sort -u)
 
 # Check if any VMs were found
 if [ -z "$instances" ]; then

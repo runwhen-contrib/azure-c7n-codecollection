@@ -11,6 +11,25 @@ grouped_json='{"storage_accounts": []}'
 
 echo "Scanning Azure Storage Accounts for misconfigurations..."
 echo "Resource Group: $resource_group"
+echo "Subscription ID: $subscription_id"
+
+# Validate resource group exists in the current subscription
+echo "Validating resource group '$resource_group' exists in subscription '$subscription_id'..."
+if ! resource_group_exists=$(az group show --name "$resource_group" --subscription "$subscription_id" --query "name" -o tsv 2>/dev/null); then
+    echo "ERROR: Resource group '$resource_group' was not found in subscription '$subscription_id'."
+    echo ""
+    echo "Available resource groups in subscription '$subscription_id':"
+    az group list --subscription "$subscription_id" --query "[].name" -o tsv | sort
+    echo ""
+    echo "Please verify:"
+    echo "1. The resource group name is correct"
+    echo "2. You have access to the resource group"
+    echo "3. You're using the correct subscription"
+    echo "4. The resource group exists in this subscription"
+    exit 1
+fi
+
+echo "Resource group '$resource_group' validated successfully."
 
 # List all storage accounts
 if ! storage_accounts=$(az storage account list -g "$resource_group" --subscription "$subscription_id" -o json 2>storage_list_err.log); then

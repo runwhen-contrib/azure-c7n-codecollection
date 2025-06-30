@@ -1,7 +1,7 @@
 policies:
   - name: vm-memory-usage
     resource: azure.vm
-    subscription: {{subscriptionId}}
+    subscription: 2a0cf760-baef-4446-b75c-75c4f8a6267f
     filters:
       - type: instance-view
         key: statuses[].code
@@ -17,9 +17,9 @@ policies:
         metric: Available Memory Bytes
         op: lt
         aggregation: average
-        threshold: {{memory_threshold}}
-        timeframe: {{timeframe}}
+        threshold: 
+        timeframe: 24
       - type: value
         key: resourceGroup
         op: eq
-        value: {{resourceGroup|upper}}
+        value: RG-CONTOSO-01-DATA

@@ -19,16 +19,16 @@ az account set --subscription "$subscription" || { echo "Failed to set subscript
 
 # Check if Microsoft.ResourceHealth provider is registered
 echo "Checking registration status of Microsoft.ResourceHealth provider..."
-registrationState=$(az provider show --namespace Microsoft.ResourceHealth --query "registrationState" -o tsv)
+registrationState=$(az provider show --namespace Microsoft.ResourceHealth --subscription "$subscription" --query "registrationState" -o tsv)
 
 if [[ "$registrationState" != "Registered" ]]; then
     echo "Registering Microsoft.ResourceHealth provider..."
-    az provider register --namespace Microsoft.ResourceHealth
+    az provider register --namespace Microsoft.ResourceHealth --subscription "$subscription"
 
     # Wait for registration
     echo "Waiting for Microsoft.ResourceHealth provider to register..."
     for i in {1..10}; do
-        registrationState=$(az provider show --namespace Microsoft.ResourceHealth --query "registrationState" -o tsv)
+        registrationState=$(az provider show --namespace Microsoft.ResourceHealth --subscription "$subscription" --query "registrationState" -o tsv)
         if [[ "$registrationState" == "Registered" ]]; then
             echo "Microsoft.ResourceHealth provider registered successfully."
             break
@@ -52,6 +52,26 @@ if [ -z "$AZURE_RESOURCE_GROUP" ]; then
     echo "Error: AZURE_RESOURCE_GROUP environment variable must be set."
     exit 1
 fi
+
+# Validate resource group exists in the current subscription
+echo "Validating resource group '$AZURE_RESOURCE_GROUP' exists in subscription '$subscription'..."
+resource_group_exists=$(az group show --name "$AZURE_RESOURCE_GROUP" --subscription "$subscription" --query "name" -o tsv 2>/dev/null)
+
+if [ -z "$resource_group_exists" ]; then
+    echo "ERROR: Resource group '$AZURE_RESOURCE_GROUP' was not found in subscription '$subscription'."
+    echo ""
+    echo "Available resource groups in subscription '$subscription':"
+    az group list --subscription "$subscription" --query "[].name" -o tsv | sort
+    echo ""
+    echo "Please verify:"
+    echo "1. The resource group name is correct"
+    echo "2. You have access to the resource group"
+    echo "3. You're using the correct subscription"
+    echo "4. The resource group exists in this subscription"
+    exit 1
+fi
+
+echo "Resource group '$AZURE_RESOURCE_GROUP' validated successfully."
 
 # Read the db-map.json file
 if [ ! -f "$DB_MAP_FILE" ]; then
@@ -83,30 +103,33 @@ for db_type in $db_types; do
     # This command needs to be adjusted based on the resource type
     case "$resource_type" in
         "azure.mysql-flexibleserver")
-            instances=$(az mysql flexible-server list -g "$AZURE_RESOURCE_GROUP" --query "[].name" -o tsv)
+            instances=$(az mysql flexible-server list -g "$AZURE_RESOURCE_GROUP" --subscription "$subscription" --query "[].name" -o tsv)
+            ;;
+        "azure.postgresql-flexibleserver")
+            instances=$(az postgres flexible-server list -g "$AZURE_RESOURCE_GROUP" --subscription "$subscription" --query "[].name" -o tsv)
             ;;
         "azure.sql-database")
             # For SQL databases, we need to get servers first, then databases
-            servers=$(az sql server list -g "$AZURE_RESOURCE_GROUP" --query "[].name" -o tsv)
+            servers=$(az sql server list -g "$AZURE_RESOURCE_GROUP" --subscription "$subscription" --query "[].name" -o tsv)
             instances=""
             for server in $servers; do
-                dbs=$(az sql db list -g "$AZURE_RESOURCE_GROUP" --server "$server" --query "[].name" -o tsv)
+                dbs=$(az sql db list -g "$AZURE_RESOURCE_GROUP" --server "$server" --subscription "$subscription" --query "[].name" -o tsv)
                 for db in $dbs; do
                     instances+="$server/$db "
                 done
             done
             ;;
         "azure.sqlserver")
-            instances=$(az sql server list -g "$AZURE_RESOURCE_GROUP" --query "[].name" -o tsv)
+            instances=$(az sql server list -g "$AZURE_RESOURCE_GROUP" --subscription "$subscription" --query "[].name" -o tsv)
             ;;
         "azure.postgresql-server")
-            instances=$(az postgres server list -g "$AZURE_RESOURCE_GROUP" --query "[].name" -o tsv)
+            instances=$(az postgres server list -g "$AZURE_RESOURCE_GROUP" --subscription "$subscription" --query "[].name" -o tsv)
             ;;
         "azure.cosmosdb")
-            instances=$(az cosmosdb list -g "$AZURE_RESOURCE_GROUP" --query "[].name" -o tsv)
+            instances=$(az cosmosdb list -g "$AZURE_RESOURCE_GROUP" --subscription "$subscription" --query "[].name" -o tsv)
             ;;
         "azure.redis")
-            instances=$(az redis list -g "$AZURE_RESOURCE_GROUP" --query "[].name" -o tsv)
+            instances=$(az redis list -g "$AZURE_RESOURCE_GROUP" --subscription "$subscription" --query "[].name" -o tsv)
             ;;
         *)
             echo "Unknown resource type: $resource_type, skipping..."

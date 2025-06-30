@@ -36,6 +36,7 @@ List Database Availability in resource group `${AZURE_RESOURCE_GROUP}`
         ...    resource=${db_info['resource']}
         ...    metric=${availability_metric}
         ...    resourceGroup=${AZURE_RESOURCE_GROUP}
+        ...    subscriptionId=${AZURE_SUBSCRIPTION_ID}
         ...    threshold=${LOW_AVAILABILITY_THRESHOLD}
         ...    timeframe=${LOW_AVAILABILITY_TIMEFRAME}
         ...    interval=${LOW_AVAILABILITY_INTERVAL}    
@@ -101,6 +102,7 @@ List Publicly Accessible Databases in resource group `${AZURE_RESOURCE_GROUP}`
         ...    resource=${db_info['resource']}
         ...    key=${db_info['publicnetworkaccess']}
         ...    resourceGroup=${AZURE_RESOURCE_GROUP}
+        ...    subscriptionId=${AZURE_SUBSCRIPTION_ID}
         
         ${c7n_output}=    RW.CLI.Run Cli
         ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-db-health ${CURDIR}/public-access.yaml --cache-period 0
@@ -163,6 +165,7 @@ List Databases Without Replication in resource group `${AZURE_RESOURCE_GROUP}`
         ...    key=${replication_config["key"]}
         ...    value=${replication_config["value"]}
         ...    resourceGroup=${AZURE_RESOURCE_GROUP}
+        ...    subscriptionId=${AZURE_SUBSCRIPTION_ID}
         RW.CLI.Run Cli    cmd=cat ${CURDIR}/replication-check.yaml    # Log generated policy
         ${c7n_output}=    RW.CLI.Run Cli
         ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-db-health ${CURDIR}/replication-check.yaml --cache-period 0
@@ -224,6 +227,7 @@ List Databases Without High Availability in resource group `${AZURE_RESOURCE_GRO
         ...    key=${ha_config["key"]}
         ...    value=${ha_config["value"]}
         ...    resourceGroup=${AZURE_RESOURCE_GROUP}
+        ...    subscriptionId=${AZURE_SUBSCRIPTION_ID}
         RW.CLI.Run Cli    cmd=cat ${CURDIR}/ha-check.yaml    # Log generated policy
         ${c7n_output}=    RW.CLI.Run Cli
         ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-db-health ${CURDIR}/ha-check.yaml --cache-period 0
@@ -280,8 +284,10 @@ List Databases With High CPU Usage in resource group `${AZURE_RESOURCE_GROUP}`
         ...    name=${db_type}
         ...    resource=${resource}
         ...    resourceGroup=${AZURE_RESOURCE_GROUP}
+        ...    subscriptionId=${AZURE_SUBSCRIPTION_ID}
         ...    threshold=${HIGH_CPU_PERCENTAGE}
         ...    timeframe=${HIGH_CPU_TIMEFRAME}
+        ...    interval=${HIGH_CPU_INTERVAL}
         ...    metric=${cpu_metric}
         RW.CLI.Run Cli    cmd=cat ${CURDIR}/high-cpu.yaml    # Log generated policy
         ${c7n_output}=    RW.CLI.Run Cli
@@ -343,8 +349,10 @@ List All Databases With High Memory Usage in resource group `${AZURE_RESOURCE_GR
         ...    name=${db_type}
         ...    resource=${resource}
         ...    resourceGroup=${AZURE_RESOURCE_GROUP}
+        ...    subscriptionId=${AZURE_SUBSCRIPTION_ID}
         ...    threshold=${HIGH_MEMORY_PERCENTAGE}
         ...    timeframe=${HIGH_MEMORY_TIMEFRAME}
+        ...    interval=${HIGH_MEMORY_INTERVAL}
         ...    metric=${memory_metric}
         RW.CLI.Run Cli    cmd=cat ${CURDIR}/high-memory.yaml    # Log generated policy
         ${c7n_output}=    RW.CLI.Run Cli
@@ -399,10 +407,14 @@ List Redis Caches With High Cache Miss Rate in resource group `${AZURE_RESOURCE_
     
     CloudCustodian.Core.Generate Policy   
     ...    ${CURDIR}/redis-cache-miss.j2
+    ...    name=redis
     ...    resource=${resource}
     ...    threshold=${HIGH_CACHE_MISS_RATE}
     ...    timeframe=${HIGH_CACHE_MISS_TIMEFRAME}
+    ...    interval=${HIGH_CACHE_MISS_INTERVAL}
+    ...    metric=cachemissrate
     ...    resourceGroup=${AZURE_RESOURCE_GROUP}
+    ...    subscriptionId=${AZURE_SUBSCRIPTION_ID}
     
     RW.CLI.Run Cli    cmd=cat ${CURDIR}/redis-cache-miss.yaml    # Log generated policy
     ${c7n_output}=    RW.CLI.Run Cli
@@ -543,7 +555,10 @@ List Database Changes in resource group `${AZURE_RESOURCE_GROUP}`
         ${changes_list}=    Create Dictionary
     END
 
-    IF    len(${changes_list}) > 0
+    # Safety check to ensure changes_list is not None
+    ${changes_list}=    Run Keyword If    $changes_list is None    Create Dictionary    ELSE    Set Variable    ${changes_list}
+
+    IF    len($changes_list) > 0
         # Loop through each database in the grouped changes
         ${all_changes}=    Create List
         
@@ -636,6 +651,12 @@ Suite Initialization
     ...    pattern=^\d+$
     ...    example=24
     ...    default=24
+    ${HIGH_CPU_INTERVAL}=    RW.Core.Import User Variable    HIGH_CPU_INTERVAL
+    ...    type=string
+    ...    description=The interval to check for high CPU usage in this formats PT1H, PT1M, PT1S etc.
+    ...    pattern=^\w+$
+    ...    example=PT5M
+    ...    default=PT5M
     ${HIGH_MEMORY_PERCENTAGE}=    RW.Core.Import User Variable    HIGH_MEMORY_PERCENTAGE
     ...    type=string
     ...    description=The memory percentage threshold to check for high memory usage.
@@ -648,6 +669,12 @@ Suite Initialization
     ...    pattern=^\d+$
     ...    example=24
     ...    default=24
+    ${HIGH_MEMORY_INTERVAL}=    RW.Core.Import User Variable    HIGH_MEMORY_INTERVAL
+    ...    type=string
+    ...    description=The interval to check for high memory usage in this formats PT1H, PT1M, PT1S etc.
+    ...    pattern=^\w+$
+    ...    example=PT5M
+    ...    default=PT5M
     ${HIGH_CACHE_MISS_RATE}=    RW.Core.Import User Variable    HIGH_CACHE_MISS_RATE
     ...    type=string
     ...    description=The cache miss rate threshold to check for high cache miss rate.
@@ -660,6 +687,12 @@ Suite Initialization
     ...    pattern=^\d+$
     ...    example=24
     ...    default=24
+    ${HIGH_CACHE_MISS_INTERVAL}=    RW.Core.Import User Variable    HIGH_CACHE_MISS_INTERVAL
+    ...    type=string
+    ...    description=The interval to check for high cache miss rate in this formats PT1H, PT1M, PT1S etc.
+    ...    pattern=^\w+$
+    ...    example=PT5M
+    ...    default=PT5M
     ${LOW_AVAILABILITY_THRESHOLD}=    RW.Core.Import User Variable    LOW_AVAILABILITY_THRESHOLD
     ...    type=string
     ...    description=The availability percentage threshold to check for low availability.
@@ -676,8 +709,8 @@ Suite Initialization
     ...    type=string
     ...    description=The interval to check for low availability in this formats PT1H, PT1M, PT1S etc.
     ...    pattern=^\w+$
-    ...    example=PT1H
-    ...    default=PT1H
+    ...    example=PT5M
+    ...    default=PT5M
     ${AZURE_ACTIVITY_LOG_LOOKBACK}=    RW.Core.Import User Variable    AZURE_ACTIVITY_LOG_LOOKBACK
     ...    type=string
     ...    description=The time offset to check for activity logs in this formats 24h, 1h, 1d etc.
@@ -694,10 +727,13 @@ Suite Initialization
     Set Suite Variable    ${AZURE_RESOURCE_GROUP}    ${AZURE_RESOURCE_GROUP}
     Set Suite Variable    ${HIGH_CPU_PERCENTAGE}    ${HIGH_CPU_PERCENTAGE}
     Set Suite Variable    ${HIGH_CPU_TIMEFRAME}    ${HIGH_CPU_TIMEFRAME}
+    Set Suite Variable    ${HIGH_CPU_INTERVAL}    ${HIGH_CPU_INTERVAL}
     Set Suite Variable    ${HIGH_MEMORY_PERCENTAGE}    ${HIGH_MEMORY_PERCENTAGE}
     Set Suite Variable    ${HIGH_MEMORY_TIMEFRAME}    ${HIGH_MEMORY_TIMEFRAME}
+    Set Suite Variable    ${HIGH_MEMORY_INTERVAL}    ${HIGH_MEMORY_INTERVAL}
     Set Suite Variable    ${HIGH_CACHE_MISS_RATE}    ${HIGH_CACHE_MISS_RATE}
     Set Suite Variable    ${HIGH_CACHE_MISS_TIMEFRAME}    ${HIGH_CACHE_MISS_TIMEFRAME}
+    Set Suite Variable    ${HIGH_CACHE_MISS_INTERVAL}    ${HIGH_CACHE_MISS_INTERVAL}
     Set Suite Variable    ${LOW_AVAILABILITY_THRESHOLD}    ${LOW_AVAILABILITY_THRESHOLD}
     Set Suite Variable    ${LOW_AVAILABILITY_TIMEFRAME}    ${LOW_AVAILABILITY_TIMEFRAME}
     Set Suite Variable    ${LOW_AVAILABILITY_INTERVAL}    ${LOW_AVAILABILITY_INTERVAL}

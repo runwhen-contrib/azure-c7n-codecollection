@@ -1,13 +1,15 @@
 policies:
-  - name: redis-cache-miss
-    resource: azure.redis
+  - name: {{name}}-cache-miss
+    resource: {{resource}}
+    subscription: {{subscriptionId}}
     filters:
       - type: metric
-        metric: cachemissrate
+        metric: {{metric}}
         op: gt
-        threshold: {{threshold}}
         aggregation: average
+        threshold: {{threshold}}
         timeframe: {{timeframe}}
+        interval: {{interval}}
       - type: value
         key: resourceGroup
         op: eq

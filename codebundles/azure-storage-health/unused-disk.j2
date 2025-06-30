@@ -1,6 +1,10 @@
+vars:
+  subscription_id: {{ subscription_id if subscription_id else "{{ subscription_id }}" }}
+
 policies:
   - name: unused-disk
     resource: azure.disk
+    subscription: {{subscriptionId}}
     filters:
       - and:
         - type: value

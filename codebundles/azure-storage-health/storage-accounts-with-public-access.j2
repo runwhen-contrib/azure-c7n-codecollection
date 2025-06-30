@@ -1,6 +1,7 @@
 policies:
   - name: storage-accounts-with-public-access
     resource: azure.storage
+    subscription: {{subscriptionId}}
     filters:
       - type: value
         key: properties.networkAcls.defaultAction
