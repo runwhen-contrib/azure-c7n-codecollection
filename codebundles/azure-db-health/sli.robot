@@ -321,7 +321,7 @@ Count Risky Database Configuration Changes in resource group `${AZURE_RESOURCE_G
     # Run the db-audit.sh script to retrieve configuration changes
     ${audit_result}=    RW.CLI.Run Bash File
     ...    bash_file=db-audit.sh
-    ...    env=${env_with_audit_lookback}
+    ...    env=${env}
     ...    timeout_seconds=200
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
@@ -521,12 +521,6 @@ Suite Initialization
     ...    pattern=^\w+$
     ...    example=24h
     ...    default=24h
-    ${AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE}=    RW.Core.Import User Variable    AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE
-    ...    type=string
-    ...    description=The time offset to check for risky configuration changes in this formats 24h, 1h, 1d etc.
-    ...    pattern=^\w+$
-    ...    example=24h
-    ...    default=24h
     Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}    ${AZURE_SUBSCRIPTION_ID}
     Set Suite Variable    ${AZURE_RESOURCE_GROUP}    ${AZURE_RESOURCE_GROUP}
     Set Suite Variable    ${MAX_PUBLIC_DB}    ${MAX_PUBLIC_DB}
@@ -552,7 +546,6 @@ Suite Initialization
     Set Suite Variable    ${MAX_RISKY_CHANGES}    ${MAX_RISKY_CHANGES}
     Set Suite Variable    ${RISKY_CHANGES_LOOKBACK}    ${RISKY_CHANGES_LOOKBACK}
     Set Suite Variable    ${AZURE_ACTIVITY_LOG_LOOKBACK}    ${AZURE_ACTIVITY_LOG_LOOKBACK}
-    Set Suite Variable    ${AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE}    ${AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE}
     
     # Set Azure subscription context for Cloud Custodian
     RW.CLI.Run Cli
@@ -561,4 +554,4 @@ Suite Initialization
     
     Set Suite Variable
     ...    ${env}
-    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}", "AZURE_ACTIVITY_LOG_OFFSET":"${AZURE_ACTIVITY_LOG_LOOKBACK}", "AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE":"${AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE}"}
+    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}", "AZURE_ACTIVITY_LOG_OFFSET":"${AZURE_ACTIVITY_LOG_LOOKBACK}"}
