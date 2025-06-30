@@ -79,7 +79,7 @@ for account in $accounts; do
 
   jq 'with_entries(.value |= map(select(.changeStatus == "Succeeded")))' _grouped.json > _succ.json
 
-  jq 'with_entries(.value |= map(select(.changeStatus != "Succeeded")))' _grouped.json > _fail.json
+  jq 'with_entries(.value |= map(select(.changeStatus == "Failed")))' _grouped.json > _fail.json
 
   jq -s 'add' "$tmp_success" _succ.json > _sc.tmp && mv _sc.tmp "$tmp_success"
   jq -s 'add' "$tmp_failed"  _fail.json > _fl.tmp && mv _fl.tmp "$tmp_failed"
