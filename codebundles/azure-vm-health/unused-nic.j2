@@ -1,7 +1,6 @@
 policies:
-  - name: unused-nics
-    resource: azure.nic
-    subscription: {{subscriptionId}}
+  - name: unused-nic
+    resource: azure.networkinterface
     filters:
       - type: value
         key: properties.virtualMachine
@@ -9,4 +8,4 @@ policies:
       - type: value
         key: resourceGroup
         op: eq
-        value: {{resourceGroup|upper}}
+        value: {{resourceGroup}}

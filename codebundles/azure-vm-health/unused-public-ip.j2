@@ -1,7 +1,6 @@
 policies:
   - name: unused-public-ip
     resource: azure.publicip
-    subscription: {{subscriptionId}}
     filters:
       - type: value
         key: properties.ipConfiguration

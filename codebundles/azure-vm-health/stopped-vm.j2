@@ -1,7 +1,6 @@
 policies:
   - name: stopped-vms
     resource: azure.vm
-    subscription: {{subscriptionId}}
     filters:
       # 1. List only VMs that are stopped (deallocated)
       - type: instance-view
@@ -9,7 +8,6 @@ policies:
         op: in
         value_type: swap
         value: PowerState/deallocated
-
       # 2. Ensure the VM has had 0% CPU usage since {{timeframe}}
       - type: metric
         metric: Percentage CPU
@@ -17,7 +15,6 @@ policies:
         aggregation: average
         threshold: 0
         timeframe: {{timeframe}} 
-
       - type: value
         key: resourceGroup
         op: eq

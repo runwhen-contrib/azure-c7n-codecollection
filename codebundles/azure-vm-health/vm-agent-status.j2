@@ -1,13 +1,11 @@
 policies:
   - name: vm-agent-status
     resource: azure.vm
-    subscription: {{subscriptionId}}
     filters:
-      # Check for VMs where the agent is unavailable (actual problem state)
       - type: instance-view
         key: vmAgent.statuses[0].code
         op: eq
-        value: "ProvisioningState/unavailable"
+        value: ProvisioningState/Unavailable
       - type: value
         key: resourceGroup
         op: eq

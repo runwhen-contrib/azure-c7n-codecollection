@@ -229,7 +229,13 @@ Suite Initialization
     ...    pattern=^\d+$
     ...    example=1
     ...    default=0
-    ${AZURE_ACTIVITY_LOG_OFFSET}=    RW.Core.Import User Variable    AZURE_ACTIVITY_LOG_OFFSET
+    ${AZURE_ACTIVITY_LOG_LOOKBACK}=    RW.Core.Import User Variable    AZURE_ACTIVITY_LOG_LOOKBACK
+    ...    type=string
+    ...    description=The time offset to check for activity logs in this formats 24h, 1h, 1d etc.
+    ...    pattern=^\w+$
+    ...    example=24h
+    ...    default=24h
+    ${AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE}=    RW.Core.Import User Variable    AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE
     ...    type=string
     ...    description=The time offset to check for activity logs in this formats 24h, 1h, 1d etc.
     ...    pattern=^\w+$
@@ -243,8 +249,14 @@ Suite Initialization
     Set Suite Variable    ${MAX_PUBLIC_ACCESS_STORAGE_ACCOUNT}    ${MAX_PUBLIC_ACCESS_STORAGE_ACCOUNT}
     Set Suite Variable    ${MAX_STORAGE_ACCOUNT_MISCONFIG}    ${MAX_STORAGE_ACCOUNT_MISCONFIG}
     Set Suite Variable    ${MAX_CRITICAL_HIGH_STORAGE_CHANGES}    ${MAX_CRITICAL_HIGH_STORAGE_CHANGES}
-    Set Suite Variable    ${AZURE_ACTIVITY_LOG_OFFSET}    ${AZURE_ACTIVITY_LOG_OFFSET}
+    Set Suite Variable    ${AZURE_ACTIVITY_LOG_LOOKBACK}    ${AZURE_ACTIVITY_LOG_LOOKBACK}
+    Set Suite Variable    ${AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE}    ${AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE}
     Set Suite Variable    ${AZURE_RESOURCE_GROUP}    ${AZURE_RESOURCE_GROUP}
     Set Suite Variable
     ...    ${env}
-    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}", "AZURE_ACTIVITY_LOG_OFFSET":"${AZURE_ACTIVITY_LOG_OFFSET}"}
+    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}", "AZURE_ACTIVITY_LOG_OFFSET":"${AZURE_ACTIVITY_LOG_LOOKBACK}", "AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE":"${AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE}"}
+    
+    # Set Azure subscription context for Cloud Custodian
+    RW.CLI.Run Cli
+    ...    cmd=az account set --subscription ${AZURE_SUBSCRIPTION_ID}
+    ...    include_in_history=false

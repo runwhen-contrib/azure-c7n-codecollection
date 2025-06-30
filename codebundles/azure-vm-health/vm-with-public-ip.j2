@@ -1,12 +1,9 @@
 policies:
   - name: vm-with-public-ip
     resource: azure.vm
-    subscription: {{subscriptionId}}
     filters:
-      - type: value
-        key: properties.networkProfile.networkInterfaces[].properties.ipConfigurations[].properties.publicIPAddress.id
+      - type: network-interface
+        key: 'properties.ipConfigurations[].properties.publicIPAddress.id'
         value: not-null
       - type: value
         key: resourceGroup
-        op: eq
-        value: {{resourceGroup|upper}}

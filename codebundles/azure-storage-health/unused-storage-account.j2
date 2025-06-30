@@ -1,7 +1,6 @@
 policies:
   - name: unused-storage-account
     resource: azure.storage
-    subscription: {{subscriptionId}}
     filters:
       - type: metric
         metric: Transactions

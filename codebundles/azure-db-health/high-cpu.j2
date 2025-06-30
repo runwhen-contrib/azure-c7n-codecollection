@@ -1,7 +1,6 @@
 policies:
   - name: {{name}}-high-cpu 
     resource: {{resource}}
-    subscription: {{subscriptionId}}
     filters:
       - type: metric
         metric: {{metric}}
@@ -9,7 +8,6 @@ policies:
         aggregation: average
         threshold: {{threshold}}
         timeframe: {{timeframe}}
-        interval: {{interval}}
       - type: value
         key: resourceGroup
         op: eq

@@ -1,7 +1,6 @@
 policies:
   - name: vm-cpu-usage
     resource: azure.vm
-    subscription: {{subscriptionId}}
     filters:
       - type: instance-view
         key: statuses[].code
