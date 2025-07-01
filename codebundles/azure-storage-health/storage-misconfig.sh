@@ -122,7 +122,7 @@ while IFS= read -r row; do
     }]')
 
   # Checks begin
-  allow_blob_public=$(echo "$props" | jq -r '.allowBlobPublicAccess // true')
+  allow_blob_public=$(echo "$props" | jq -r '.allowBlobPublicAccess // false')
   if [[ "$allow_blob_public" == "true" ]]; then
     add_issue_to_account "$name" \
       "Blob public access enabled" \
