@@ -39,6 +39,21 @@ if ! storage_accounts=$(az storage account list -g "$resource_group" --subscript
 fi
 rm -f storage_list_err.log
 
+# Validate JSON response and check for empty result
+if [ -z "$storage_accounts" ] || ! echo "$storage_accounts" | jq . > /dev/null 2>/dev/null; then
+    echo "ERROR: Invalid or empty JSON response from az storage account list"
+    exit 1
+fi
+
+# Check if we have any storage accounts
+storage_count=$(echo "$storage_accounts" | jq 'length' 2>/dev/null || echo "0")
+if [ "$storage_count" -eq 0 ]; then
+    echo "No storage accounts found in resource group '$resource_group'"
+    echo "$grouped_json" > "$output_file"
+    echo "Report saved to: $output_file"
+    exit 0
+fi
+
 # Add issue to grouped JSON
 add_issue_to_account() {
   local name="$1"
@@ -68,8 +83,14 @@ add_issue_to_account() {
     )')
 }
 
-# Loop through storage accounts
-for row in $(echo "$storage_accounts" | jq -c '.[]'); do
+# Loop through storage accounts using process substitution (more robust than for loop)
+while IFS= read -r row; do
+  # Validate each row is valid JSON before processing
+  if ! echo "$row" | jq . > /dev/null 2>/dev/null; then
+    echo "WARNING: Skipping invalid JSON row: $row"
+    continue
+  fi
+  
   name=$(echo "$row" | jq -r '.name')
   id=$(echo "$row" | jq -r '.id')
   url="https://portal.azure.com/#@/resource${id}"
@@ -81,7 +102,12 @@ for row in $(echo "$storage_accounts" | jq -c '.[]'); do
     continue
   fi
   rm -f prop_err.log
-  props_json=$(echo "$props" | jq '.')
+  
+  # Validate properties JSON before using it
+  if ! props_json=$(echo "$props" | jq '.' 2>/dev/null); then
+    echo "WARNING: Invalid JSON properties for $name, skipping"
+    continue
+  fi
 
   # Initialize entry in grouped JSON
   grouped_json=$(echo "$grouped_json" | jq \
@@ -161,7 +187,7 @@ for row in $(echo "$storage_accounts" | jq -c '.[]'); do
       "Restrict access by setting defaultAction to Deny and configuring IP/VNet rules." \
       4
   fi
-done
+done < <(echo "$storage_accounts" | jq -c '.[]')
 
 # Write final grouped JSON
 echo "$grouped_json" > "$output_file"

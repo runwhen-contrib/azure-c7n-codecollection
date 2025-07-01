@@ -49,6 +49,7 @@ Check for VMs With Public IP in resource group `${AZURE_RESOURCE_GROUP}`
     ...    subscriptionId=${AZURE_SUBSCRIPTION_ID}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/vm-with-public-ip.yaml --cache-period 0
+    ...    timeout_seconds=180
     ${count}=    RW.CLI.Run Cli
     ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-health/vm-with-public-ip/metadata.json | jq '.metrics[] | select(.MetricName == "ResourceCount") | .Value';
     ${vm_with_public_ip_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_VM_WITH_PUBLIC_IP}) else 0
@@ -64,6 +65,7 @@ Check for Stopped VMs in resource group `${AZURE_RESOURCE_GROUP}`
     ...    subscriptionId=${AZURE_SUBSCRIPTION_ID}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/stopped-vm.yaml --cache-period 0
+    ...    timeout_seconds=180
     ${count}=    RW.CLI.Run Cli
     ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-health/stopped-vms/metadata.json | jq '.metrics[] | select(.MetricName == "ResourceCount") | .Value';
     ${stopped_vm_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_STOPPED_VM}) else 0
@@ -79,6 +81,7 @@ Check for VMs With High CPU Usage in resource group `${AZURE_RESOURCE_GROUP}`
     ...    resourceGroup=${AZURE_RESOURCE_GROUP}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/vm-cpu-usage.yaml --cache-period 0
+    ...    timeout_seconds=180
     ${report_data}=    RW.CLI.Run Cli
     ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-health/vm-cpu-usage/resources.json
 
@@ -121,6 +124,7 @@ Check for Underutilized VMs Based on CPU Usage in resource group `${AZURE_RESOUR
     ...    subscriptionId=${AZURE_SUBSCRIPTION_ID}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/under-utilized-vm-cpu-usage.yaml --cache-period 0
+    ...    timeout_seconds=180
     ${report_data}=    RW.CLI.Run Cli
     ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-health/under-utilized-vm-cpu-usage/resources.json
 
@@ -163,6 +167,7 @@ Check for VMs With High Memory Usage in resource group `${AZURE_RESOURCE_GROUP}`
     ...    subscriptionId=${AZURE_SUBSCRIPTION_ID}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/vm-memory-usage.yaml --cache-period 0
+    ...    timeout_seconds=180
     ${report_data}=    RW.CLI.Run Cli
     ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-health/vm-memory-usage/resources.json
 
@@ -207,6 +212,7 @@ Check for Underutilized VMs Based on Memory Usage in resource group `${AZURE_RES
     ...    subscriptionId=${AZURE_SUBSCRIPTION_ID}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/vm-memory-usage.yaml --cache-period 0
+    ...    timeout_seconds=180
     ${report_data}=    RW.CLI.Run Cli
     ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-health/vm-memory-usage/resources.json
 
@@ -248,6 +254,7 @@ Check for Unused Network Interfaces in resource group `${AZURE_RESOURCE_GROUP}`
     ...    subscriptionId=${AZURE_SUBSCRIPTION_ID}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/unused-nic.yaml --cache-period 0
+    ...    timeout_seconds=180
     ${count}=    RW.CLI.Run Cli
     ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-health/unused-nic/metadata.json | jq '.metrics[] | select(.MetricName == "ResourceCount") | .Value';
     ${unused_nic_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_UNUSED_NIC}) else 0
@@ -263,6 +270,7 @@ Check for Unused Public IPs in resource group `${AZURE_RESOURCE_GROUP}`
     ...    subscriptionId=${AZURE_SUBSCRIPTION_ID}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-vm-health ${CURDIR}/unused-public-ip.yaml --cache-period 0
+    ...    timeout_seconds=180
     ${count}=    RW.CLI.Run Cli
     ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-health/unused-publicip/metadata.json | jq '.metrics[] | select(.MetricName == "ResourceCount") | .Value';
     ${unused_public_ip_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_UNUSED_PUBLIC_IP}) else 0
@@ -277,6 +285,7 @@ Check VMs Agent Status in resource group `${AZURE_RESOURCE_GROUP}`
     ...    subscriptionId=${AZURE_SUBSCRIPTION_ID}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s azure-c7n-vm-health vm-agent-status.yaml --cache-period 0
+    ...    timeout_seconds=180
     ${count}=    RW.CLI.Run Cli
     ...    cmd=cat azure-c7n-vm-health/vm-agent-status/metadata.json | jq '.metrics[] | select(.MetricName == "ResourceCount") | .Value';
     ${vm_agent_status_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_VM_AGENT_STATUS}) else 0
