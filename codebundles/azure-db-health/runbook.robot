@@ -106,6 +106,7 @@ List Publicly Accessible Databases in resource group `${AZURE_RESOURCE_GROUP}`
         
         ${c7n_output}=    RW.CLI.Run Cli
         ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-db-health ${CURDIR}/public-access.yaml --cache-period 0
+        ...    timeout_seconds=180
         
         ${report_data}=    RW.CLI.Run Cli
         ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-db-health/${policy_name}/resources.json

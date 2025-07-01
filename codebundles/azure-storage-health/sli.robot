@@ -46,6 +46,7 @@ Count Unused Disks in resource group `${AZURE_RESOURCE_GROUP}`
     ...    subscriptionId=${AZURE_SUBSCRIPTION_ID}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-disk-triage ${CURDIR}/unused-disk.yaml --cache-period 0
+    ...    timeout_seconds=180
     ${count}=    RW.CLI.Run Cli
     ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-disk-triage/unused-disk/metadata.json | jq '.metrics[] | select(.MetricName == "ResourceCount") | .Value';
     ${unused_disk_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_UNUSED_DISK}) else 0
@@ -60,6 +61,7 @@ Count Unused Snapshots in resource group `${AZURE_RESOURCE_GROUP}`
     ...    subscriptionId=${AZURE_SUBSCRIPTION_ID}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-snapshot-triage ${CURDIR}/unused-snapshot.yaml --cache-period 0
+    ...    timeout_seconds=180
     ${count}=    RW.CLI.Run Cli
     ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-snapshot-triage/unused-snapshot/metadata.json | jq '.metrics[] | select(.MetricName == "ResourceCount") | .Value';
     ${unused_snapshot_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_UNUSED_SNAPSHOT}) else 0
@@ -75,6 +77,7 @@ Count Unused Storage Accounts in resource group `${AZURE_RESOURCE_GROUP}`
     ...    subscriptionId=${AZURE_SUBSCRIPTION_ID}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-storage-triage ${CURDIR}/unused-storage-account.yaml --cache-period 0
+    ...    timeout_seconds=180
     ${count}=    RW.CLI.Run Cli
     ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-storage-triage/unused-storage-account/metadata.json | jq '.metrics[] | select(.MetricName == "ResourceCount") | .Value';
     ${unused_storage_account_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_UNUSED_STORAGE_ACCOUNT}) else 0
@@ -90,6 +93,7 @@ Count Storage Containers with Public Access in resource group `${AZURE_RESOURCE_
     ...    subscriptionId=${AZURE_SUBSCRIPTION_ID}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s azure-c7n-storage-containers-public-access stg-containers-with-public-access.yaml --cache-period 0
+    ...    timeout_seconds=180
     ${count}=    RW.CLI.Run Cli
     ...    cmd=cat azure-c7n-storage-containers-public-access/storage-container-public/metadata.json | jq '.metrics[] | select(.MetricName == "ResourceCount") | .Value';
     ${public_access_container_score}=    Evaluate    1 if int(${count.stdout}) <= int(${MAX_PUBLIC_ACCESS_STORAGE_ACCOUNT}) else 0
@@ -107,13 +111,14 @@ Count Storage Account Misconfigurations in resource group `${AZURE_RESOURCE_GROU
     ...    include_in_history=false
 
     ${log_file}=    Set Variable    storage_misconfig.json
-    ${misconfig_output}=    RW.CLI.Run Cli
-    ...    cmd=cat ${log_file}
-    # Load JSON results.  If the file is missing or malformed, report an issue and abort.
+    
+    # Check if the file exists and has content, otherwise create empty structure
     TRY
+        ${misconfig_output}=    RW.CLI.Run Cli
+        ...    cmd=cat ${log_file}
         ${data}=    Evaluate    json.loads('''${misconfig_output.stdout}''')    json
     EXCEPT    Exception as e
-        Log    Failed to load JSON payload, defaulting to empty result set. Error: ${str(e)}    WARN
+        Log    Failed to read or parse storage misconfig file, defaulting to empty result set. Error: ${str(e)}    WARN
         ${data}=    Create Dictionary    storage_accounts=[]
     END
     ${count}=    Evaluate    len(${data.get('storage_accounts', [])})

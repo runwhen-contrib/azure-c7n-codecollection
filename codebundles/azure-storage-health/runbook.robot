@@ -72,6 +72,7 @@ List Unused Azure Disks in resource group `${AZURE_RESOURCE_GROUP}`
     ...    subscriptionId=${AZURE_SUBSCRIPTION_ID}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-disk-triage ${CURDIR}/unused-disk.yaml --cache-period 0
+    ...    timeout_seconds=180
     ${report_data}=    RW.CLI.Run Cli
     ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-disk-triage/unused-disk/resources.json
 
@@ -114,6 +115,7 @@ List Unused Azure Snapshots in resource group `${AZURE_RESOURCE_GROUP}`
     ...    subscriptionId=${AZURE_SUBSCRIPTION_ID}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-snapshot-triage ${CURDIR}/unused-snapshot.yaml --cache-period 0
+    ...    timeout_seconds=180
     ${report_data}=    RW.CLI.Run Cli
     ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-snapshot-triage/unused-snapshot/resources.json
 
@@ -157,6 +159,7 @@ List Unused Azure Storage Accounts in resource group `${AZURE_RESOURCE_GROUP}`
     ...    subscriptionId=${AZURE_SUBSCRIPTION_ID}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s ${OUTPUT_DIR}/azure-c7n-storage-triage ${CURDIR}/unused-storage-account.yaml --cache-period 0
+    ...    timeout_seconds=180
     ${report_data}=    RW.CLI.Run Cli
     ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-storage-triage/unused-storage-account/resources.json
 
@@ -198,6 +201,7 @@ List Storage Containers with Public Access in resource group `${AZURE_RESOURCE_G
     ...    subscriptionId=${AZURE_SUBSCRIPTION_ID}
     ${c7n_output}=    RW.CLI.Run Cli
     ...    cmd=custodian run -s azure-c7n-storage-containers-public-access stg-containers-with-public-access.yaml --cache-period 0
+    ...    timeout_seconds=180
     ${report_data}=    RW.CLI.Run Cli
     ...    cmd=cat azure-c7n-storage-containers-public-access/storage-container-public/resources.json
     TRY
