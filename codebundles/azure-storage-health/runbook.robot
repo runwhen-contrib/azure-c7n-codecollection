@@ -330,8 +330,8 @@ List Storage Account Changes in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Lists storage account changes and operations from Azure Activity Log
     [Tags]    Storage    Azure    Audit    Security    access:read-only
     
-    ${success_file}=    Set Variable    stg_changes_success.json
-    ${failed_file}=    Set Variable    stg_changes_failed.json
+    ${success_file}=    Set Variable    ${CURDIR}/stg_changes_success.json
+    ${failed_file}=    Set Variable    ${CURDIR}/stg_changes_failed.json
     
     ${audit_cmd}=    RW.CLI.Run Bash File
     ...    bash_file=stg-audit.sh
@@ -361,12 +361,14 @@ List Storage Account Changes in resource group `${AZURE_RESOURCE_GROUP}`
     END
 
     # Process successful changes
-    IF    len(${success_changes}) > 0
+    ${success_length}=    Get Length    ${success_changes}
+    IF    ${success_length} > 0
         FOR    ${stg_name}    IN    @{success_changes.keys()}
             ${stg_changes}=    Set Variable    ${success_changes["${stg_name}"]}
+            ${stg_changes_length}=    Get Length    ${stg_changes}
             
             # Skip if no changes for this storage account
-            IF    len(@{stg_changes}) == 0
+            IF    ${stg_changes_length} == 0
                 CONTINUE
             END
             
@@ -411,12 +413,14 @@ List Storage Account Changes in resource group `${AZURE_RESOURCE_GROUP}`
     END
 
     # Process failed changes
-    IF    len(${failed_changes}) > 0
+    ${failed_length}=    Get Length    ${failed_changes}
+    IF    ${failed_length} > 0
         FOR    ${stg_name}    IN    @{failed_changes.keys()}
             ${stg_changes}=    Set Variable    ${failed_changes["${stg_name}"]}
+            ${stg_changes_length}=    Get Length    ${stg_changes}
             
             # Skip if no changes for this storage account
-            IF    len(@{stg_changes}) == 0
+            IF    ${stg_changes_length} == 0
                 CONTINUE
             END
             
@@ -503,4 +507,4 @@ Suite Initialization
     
     Set Suite Variable
     ...    ${env}
-    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}", "AZURE_ACTIVITY_LOG_OFFSET":"${AZURE_ACTIVITY_LOG_LOOKBACK}", "AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE":"${AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE}"}
+    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}", "AZURE_ACTIVITY_LOG_OFFSET":"${AZURE_ACTIVITY_LOG_LOOKBACK}", "AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE":"${AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE}", "FILE_PREFIX":"${CURDIR}/"}
