@@ -7,11 +7,13 @@
 #   AZURE_SUBSCRIPTION_ID       – subscription to query (default: current)
 #   AZURE_RESOURCE_GROUP        – resource group containing storage accounts (required)
 #   AZURE_ACTIVITY_LOG_OFFSET   – time window e.g. 24h, 7d (default: 24h)
+#   FILE_PREFIX                 – prefix for output files (default: current directory)
 
 set -euo pipefail
 
-SUCCESS_OUTPUT="stg_changes_success.json"
-FAILED_OUTPUT="stg_changes_failed.json"
+FILE_PREFIX="${FILE_PREFIX:-}"
+SUCCESS_OUTPUT="${FILE_PREFIX}stg_changes_success.json"
+FAILED_OUTPUT="${FILE_PREFIX}stg_changes_failed.json"
 echo "{}" > "$SUCCESS_OUTPUT"
 echo "{}" > "$FAILED_OUTPUT"
 
@@ -37,8 +39,8 @@ if [ -z "$accounts" ]; then
   exit 0
 fi
 
-tmp_success="$(mktemp)"
-tmp_failed="$(mktemp)"
+tmp_success="${FILE_PREFIX}tmp_success_$(date +%s).json"
+tmp_failed="${FILE_PREFIX}tmp_failed_$(date +%s).json"
 echo "{}" > "$tmp_success"
 echo "{}" > "$tmp_failed"
 
