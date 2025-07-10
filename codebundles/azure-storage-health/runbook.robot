@@ -227,7 +227,7 @@ List Storage Containers with Public Access in resource group `${AZURE_RESOURCE_G
             ...    Unknown public access level
             
             RW.Core.Add Issue
-            ...    severity=3
+            ...    severity=4
             ...    expected=Azure storage container `${container_name}` should have restricted public access in resource group `${resource_group}`
             ...    actual=Azure storage container `${container_name}` has public access level '${public_access}' (${access_description}) in resource group `${resource_group}`
             ...    title=Public Accessible Azure Storage Container `${container_name}` found in Resource Group `${resource_group}`
