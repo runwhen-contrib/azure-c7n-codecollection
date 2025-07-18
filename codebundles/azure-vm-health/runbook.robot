@@ -242,54 +242,108 @@ List Underutilized VMs Based on CPU Usage in resource group `${AZURE_RESOURCE_GR
         ${vm_list}=    Create List
     END
 
-    IF    len(@{vm_list}) > 0
-        ${formatted_results}=    RW.CLI.Run Cli
-        ...    cmd=jq -r '["VM_Name", "Resource_Group", "Location", "CPU_Usage%", "VM_Status", "VM_Link"], (.[] | [ .name, (.resourceGroup | ascii_downcase), .location, (."c7n:metrics" | to_entries | map(.value.measurement[0]) | first // "N/A" | tonumber | (. * 100 | round / 100) | tostring), (.instanceView.statuses[0].code // "Unknown"), ("https://portal.azure.com/#@/resource" + .id + "/overview") ]) | @tsv' ${OUTPUT_DIR}/azure-c7n-vm-health/under-utilized-vm-cpu-usage/resources.json | column -t
-        RW.Core.Add Pre To Report    Underutilized VMs Based on CPU Summary:\n========================\n${formatted_results.stdout}
+    ${underutilized_vms}=    Create List
+    ${metrics_unavailable_vms}=    Create List
 
-        FOR    ${vm}    IN    @{vm_list}
-            ${pretty_vm}=    Evaluate    pprint.pformat(${vm})    modules=pprint
-            ${resource_group}=    Set Variable    ${vm['resourceGroup'].lower()}
-            ${vm_name}=    Set Variable    ${vm['name']}
-            ${json_str}=    Evaluate    json.dumps(${vm})    json
+    # Process VMs and collect data
+    FOR    ${vm}    IN    @{vm_list}
+        ${vm_name}=    Set Variable    ${vm['name']}
+        ${resource_group}=    Set Variable    ${vm['resourceGroup'].lower()}
+        ${json_str}=    Evaluate    json.dumps(${vm})    json
+        
+        # Check if metrics are available
+        ${metrics_available}=    RW.CLI.Run Cli
+        ...    cmd=echo '${json_str}' | jq -r '(."c7n:metrics" | to_entries | map(.value.measurement[0]) | first) != null'
+        
+        ${metrics_available_clean}=    Strip String    ${metrics_available.stdout}
+        
+        IF    "${metrics_available_clean}" == "true"
+            ${cpu_percentage_result}=    RW.CLI.Run Cli
+            ...    cmd=echo '${json_str}' | jq -r '(."c7n:metrics" | to_entries | map(.value.measurement[0]) | first // "0")'
+            ${cpu_percentage}=    Convert To Number    ${cpu_percentage_result.stdout}    2
             
-            # Check if metrics are available
-            ${metrics_available}=    RW.CLI.Run Cli
-            ...    cmd=echo '${json_str}' | jq -r '(."c7n:metrics" | to_entries | map(.value.measurement[0]) | first) != null'
+            ${vm_data}=    Create Dictionary
+            ...    name=${vm_name}
+            ...    resource_group=${resource_group}
+            ...    location=${vm.get('location', 'N/A')}
+            ...    cpu_percentage=${cpu_percentage}
+            ...    status=${vm.get('instanceView', {}).get('statuses', [{}])[0].get('code', 'Unknown')}
+            ...    id=${vm.get('id', '')}
             
-            ${metrics_available_clean}=    Strip String    ${metrics_available.stdout}
-            IF    "${metrics_available_clean}" == "true"
-                ${cpu_percentage_result}=    RW.CLI.Run Cli
-                ...    cmd=echo '${json_str}' | jq -r '(."c7n:metrics" | to_entries | map(.value.measurement[0]) | first // "0")'
-                # Convert to a number for further processing
-                ${cpu_percentage}=    Convert To Number    ${cpu_percentage_result.stdout}    2
-                RW.Core.Add Issue
-                ...    severity=4
-                ...    expected=Azure VM `${vm_name}` should have adequate CPU utilization in resource group `${resource_group}`
-                ...    actual=Azure VM `${vm_name}` has low CPU usage of `${cpu_percentage}%` in the last `${LOW_CPU_TIMEFRAME}` hours in resource group `${resource_group}`
-                ...    title=Underutilized CPU on Azure VM `${vm_name}` found in Resource Group `${resource_group}`
-                ...    reproduce_hint=${c7n_output.cmd}
-                ...    details=${pretty_vm}
-                ...    next_steps=Consider downsizing the VM to optimize costs in resource group `${AZURE_RESOURCE_GROUP}`
-            ELSE
-                # Check VM agent status when metrics are not available
-                ${vm_agent_status}=    RW.CLI.Run Cli
-                ...    cmd=echo '${json_str}' | jq -r '(.instanceView.vmAgent.statuses[0].code // "Unknown")'
-                ${vm_status}=    RW.CLI.Run Cli
-                ...    cmd=echo '${json_str}' | jq -r '(.instanceView.statuses[0].code // "Unknown")'
-                
-                RW.Core.Add Issue
-                ...    severity=4
-                ...    expected=Azure VM `${vm_name}` should have available CPU metrics in resource group `${resource_group}`
-                ...    actual=CPU metrics are not available for VM `${vm_name}`. VM Agent Status: ${vm_agent_status.stdout}, VM Status: ${vm_status.stdout}
-                ...    title=CPU Metrics Unavailable for Azure VM `${vm_name}` in Resource Group `${resource_group}`
-                ...    reproduce_hint=${c7n_output.cmd}
-                ...    details=${pretty_vm}
-                ...    next_steps=Check VM diagnostics settings in resource group `${AZURE_RESOURCE_GROUP}`
-            END
+            Append To List    ${underutilized_vms}    ${vm_data}
+        ELSE
+            ${vm_agent_status}=    RW.CLI.Run Cli
+            ...    cmd=echo '${json_str}' | jq -r '(.instanceView.vmAgent.statuses[0].code // "Unknown")'
+            ${vm_status}=    RW.CLI.Run Cli
+            ...    cmd=echo '${json_str}' | jq -r '(.instanceView.statuses[0].code // "Unknown")'
+            
+            ${vm_data}=    Create Dictionary
+            ...    name=${vm_name}
+            ...    resource_group=${resource_group}
+            ...    location=${vm.get('location', 'N/A')}
+            ...    vm_agent_status=${vm_agent_status.stdout}
+            ...    vm_status=${vm_status.stdout}
+            ...    id=${vm.get('id', '')}
+            
+            Append To List    ${metrics_unavailable_vms}    ${vm_data}
         END
-    ELSE
-        RW.Core.Add Pre To Report    "No underutilized VMs found in resource group `${AZURE_RESOURCE_GROUP}`"
+    END
+
+    # Report underutilized VMs if any
+    IF    ${underutilized_vms.__len__()} > 0
+        ${report}=    Set Variable    \n=== Underutilized VMs (Low CPU Usage) ===\n
+        ${temp_file}=    Set Variable    ${OUTPUT_DIR}/vm_cpu_data.json
+        ${vm_data_json}=    Evaluate    json.dumps(${underutilized_vms})    json
+        RW.CLI.Run Cli    cmd=echo '${vm_data_json.replace("'", "'\\''")}' > ${temp_file}
+        
+        ${formatted_results}=    RW.CLI.Run Cli
+        ...    cmd=cat ${temp_file} | jq -r '["VM Name", "Resource Group", "Location", "CPU Usage %", "Status", "Link"], (.[] | [.name, .resource_group, .location, (if .cpu_percentage == null then "N/A" else (.cpu_percentage | tostring + "%") end), .status, ("https://portal.azure.com/#@/resource" + .id + "/overview")]) | @tsv' | column -t -s '\t' -o ' | '
+        
+        ${report}=    Set Variable    ${report}${formatted_results.stdout}
+        RW.CLI.Run Cli    cmd=rm -f ${temp_file}
+        
+        RW.Core.Add Pre To Report    ${report}
+        
+        # Convert VMs to JSON for details
+        ${vms_json}=    Evaluate    json.dumps(${underutilized_vms}, indent=4)    json
+        
+        RW.Core.Add Issue
+        ...    severity=4
+        ...    expected=Azure VMs should have adequate CPU utilization in resource group `${AZURE_RESOURCE_GROUP}`
+        ...    actual=Found ${underutilized_vms.__len__()} underutilized VMs in resource group `${AZURE_RESOURCE_GROUP}`
+        ...    title=Underutilized CPU on Azure VMs in Resource Group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+        ...    reproduce_hint=${c7n_output.cmd}
+        ...    details={"underutilized_vms": ${vms_json}, "resource_group": "${AZURE_RESOURCE_GROUP}", "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
+        ...    next_steps=Consider downsizing or optimizing the VMs listed above to reduce costs
+    END
+
+    # Report VMs with metrics unavailable if any
+    IF    ${metrics_unavailable_vms.__len__()} > 0
+        ${metrics_report}=    Set Variable    \n=== VMs with CPU Metrics Unavailable ===\n\n
+        FOR    ${vm}    IN    @{metrics_unavailable_vms}
+            ${metrics_report}=    Set Variable    ${metrics_report}${vm['name']} (${vm['resource_group']}):\n
+            ${metrics_report}=    Set Variable    ${metrics_report}  - Agent Status: ${vm['vm_agent_status']}\n
+            ${metrics_report}=    Set Variable    ${metrics_report}  - VM Status: ${vm['vm_status']}\n\n
+        END
+        
+        RW.Core.Add Pre To Report    ${metrics_report}
+        
+        # Convert metrics unavailable VMs to JSON for details
+        ${metrics_unavailable_json}=    Evaluate    json.dumps(${metrics_unavailable_vms}, indent=4)    json
+        
+        RW.Core.Add Issue
+        ...    severity=2
+        ...    expected=All VMs should have CPU metrics collection enabled
+        ...    actual=Found ${metrics_unavailable_vms.__len__()} VMs with CPU metrics unavailable
+        ...    title=${metrics_unavailable_vms.__len__()} VMs with CPU Metrics Unavailable in Resource Group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+        ...    reproduce_hint=${c7n_output.cmd}
+        ...    details={"vms_without_cpu_metrics": ${metrics_unavailable_json}, "resource_group": "${AZURE_RESOURCE_GROUP}", "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
+        ...    next_steps=Check VM diagnostics and agent status for the VMs listed above
+    END
+
+    # If no issues found
+    IF    ${underutilized_vms.__len__()} == 0 and ${metrics_unavailable_vms.__len__()} == 0
+        RW.Core.Add Pre To Report    "No underutilized VMs or CPU metrics issues found in resource group `${AZURE_RESOURCE_GROUP}`"
     END
 
 List VMs With High Memory Usage in resource group `${AZURE_RESOURCE_GROUP}`
