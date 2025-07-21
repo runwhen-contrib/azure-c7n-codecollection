@@ -215,12 +215,12 @@ List VMs With High CPU Usage in resource group `${AZURE_RESOURCE_GROUP}`
             ${vm_data_json}=    Evaluate    json.dumps(${high_cpu_vms})    json
             RW.CLI.Run Cli    cmd=echo '${vm_data_json.replace("'", "'\\''")}' > ${temp_file}
             
-            # Generate formatted table
+            # Generate formatted table with markdown links for VM names
             ${formatted_results}=    RW.CLI.Run Cli
-            ...    cmd=jq -r '["VM Name", "Resource Group", "Location", "CPU Usage %", "Status", "Link"], (.[] | [.name, .resource_group, .location, .cpu_percentage, .vm_status, .vm_link]) | @tsv' ${temp_file} | column -t -s $'\t'
+            ...    cmd=jq -r '["VM Name", "Resource Group", "Location", "CPU Usage %", "Status"], (.[] | ["[" + .name + "](" + .vm_link + ")", .resource_group, .location, .cpu_percentage, .vm_status]) | @tsv' ${temp_file} | column -t -s $'\t'
             ${report}=    Set Variable    ${report}${formatted_results.stdout}
             
-            RW.Core.Add Pre To Report    ${report}
+            RW.Core.Add To Report    ${report}
             
             # Add single issue with JSON details
             ${vms_json}=    Evaluate    json.dumps(${high_cpu_vms}, indent=4)    json
@@ -247,10 +247,10 @@ List VMs With High CPU Usage in resource group `${AZURE_RESOURCE_GROUP}`
             
             # Generate formatted table
             ${formatted_results}=    RW.CLI.Run Cli
-            ...    cmd=jq -r '["VM Name", "Resource Group", "Location", "VM Agent Status", "VM Status", "Link"], (.[] | [.name, .resource_group, .location, .vm_agent_status, .vm_status, .vm_link]) | @tsv' ${temp_file} | column -t -s $'\t'
+            ...    cmd=jq -r '["VM Name", "Resource Group", "Location", "VM Agent Status", "VM Status"], (.[] | ["[" + .name + "](" + .vm_link + ")", .resource_group, .location, .vm_agent_status, .vm_status]) | @tsv' ${temp_file} | column -t -s $'\t'
             ${report}=    Set Variable    ${report}${formatted_results.stdout}
             
-            RW.Core.Add Pre To Report    ${report}
+            RW.Core.Add To Report    ${report}
             
             # Add single issue with JSON details
             ${vms_json}=    Evaluate    json.dumps(${metrics_unavailable_vms}, indent=4)    json
@@ -322,6 +322,7 @@ List Underutilized VMs Based on CPU Usage in resource group `${AZURE_RESOURCE_GR
             ...    resource_group=${resource_group}
             ...    location=${vm.get('location', 'N/A')}
             ...    cpu_percentage=${cpu_percentage}
+            ...    vm_link=https://portal.azure.com/#@/resource${vm['id']}/overview
             ...    status=${vm.get('instanceView', {}).get('statuses', [{}])[0].get('code', 'Unknown')}
             ...    id=${vm.get('id', '')}
             
@@ -338,6 +339,7 @@ List Underutilized VMs Based on CPU Usage in resource group `${AZURE_RESOURCE_GR
             ...    location=${vm.get('location', 'N/A')}
             ...    vm_agent_status=${vm_agent_status.stdout}
             ...    vm_status=${vm_status.stdout}
+            ...    vm_link=https://portal.azure.com/#@/resource${vm['id']}/overview
             ...    id=${vm.get('id', '')}
             
             Append To List    ${metrics_unavailable_vms}    ${vm_data}
@@ -352,12 +354,12 @@ List Underutilized VMs Based on CPU Usage in resource group `${AZURE_RESOURCE_GR
         RW.CLI.Run Cli    cmd=echo '${vm_data_json.replace("'", "'\\''")}' > ${temp_file}
         
         ${formatted_results}=    RW.CLI.Run Cli
-        ...    cmd=cat ${temp_file} | jq -r '["VM Name", "Resource Group", "Location", "CPU Usage %", "Status", "Link"], (.[] | [.name, .resource_group, .location, (if .cpu_percentage == null then "N/A" else (.cpu_percentage | tostring + "%") end), .status, ("https://portal.azure.com/#@/resource" + .id + "/overview")]) | @tsv' | column -t -s '\t' -o ' | '
+        ...    cmd=cat ${temp_file} | jq -r '["VM Name", "Resource Group", "Location", "CPU Usage %", "Status"], (.[] | ["[" + .name + "](" + .vm_link + ")", .resource_group, .location, (if .cpu_percentage == null then "N/A" else (.cpu_percentage | tostring + "%") end), .status]) | @tsv' | column -t -s '\t' -o ' | '
         
         ${report}=    Set Variable    ${report}${formatted_results.stdout}
         RW.CLI.Run Cli    cmd=rm -f ${temp_file}
         
-        RW.Core.Add Pre To Report    ${report}
+        RW.Core.Add To Report    ${report}
         
         # Convert VMs to JSON for details
         ${vms_json}=    Evaluate    json.dumps(${underutilized_vms}, indent=4)    json
@@ -381,7 +383,7 @@ List Underutilized VMs Based on CPU Usage in resource group `${AZURE_RESOURCE_GR
             ${metrics_report}=    Set Variable    ${metrics_report}  - VM Status: ${vm['vm_status']}\n\n
         END
         
-        RW.Core.Add Pre To Report    ${metrics_report}
+        RW.Core.Add To Report    ${metrics_report}
         
         # Convert metrics unavailable VMs to JSON for details
         ${metrics_unavailable_json}=    Evaluate    json.dumps(${metrics_unavailable_vms}, indent=4)    json
@@ -472,10 +474,10 @@ List VMs With High Memory Usage in resource group `${AZURE_RESOURCE_GROUP}`
             
             # Generate formatted table
             ${formatted_results}=    RW.CLI.Run Cli
-            ...    cmd=jq -r '["VM Name", "Resource Group", "Location", "Memory Usage %", "Status", "Link"], (.[] | [.name, .resource_group, .location, .memory_usage_percent, .vm_status, .vm_link]) | @tsv' ${temp_file} | column -t -s $'\t'
+            ...    cmd=jq -r '["VM Name", "Resource Group", "Location", "Memory Usage %", "Status"], (.[] | ["[" + .name + "](" + .vm_link + ")", .resource_group, .location, .memory_usage_percent, .vm_status]) | @tsv' ${temp_file} | column -t -s $'\t'
             ${report}=    Set Variable    ${report}${formatted_results.stdout}
             
-            RW.Core.Add Pre To Report    ${report}
+            RW.Core.Add To Report    ${report}
             
             # Add single issue with JSON details
             ${vms_json}=    Evaluate    json.dumps(${high_memory_vms}, indent=4)    json
@@ -502,10 +504,10 @@ List VMs With High Memory Usage in resource group `${AZURE_RESOURCE_GROUP}`
             
             # Generate formatted table
             ${formatted_results}=    RW.CLI.Run Cli
-            ...    cmd=jq -r '["VM Name", "Resource Group", "Location", "VM Agent Status", "VM Status", "Link"], (.[] | [.name, .resource_group, .location, .vm_agent_status, .vm_status, .vm_link]) | @tsv' ${temp_file} | column -t -s $'\t'
+            ...    cmd=jq -r '["VM Name", "Resource Group", "Location", "VM Agent Status", "VM Status"], (.[] | ["[" + .name + "](" + .vm_link + ")", .resource_group, .location, .vm_agent_status, .vm_status]) | @tsv' ${temp_file} | column -t -s $'\t'
             ${report}=    Set Variable    ${report}${formatted_results.stdout}
             
-            RW.Core.Add Pre To Report    ${report}
+            RW.Core.Add To Report    ${report}
             
             # Add single issue with JSON details
             ${vms_json}=    Evaluate    json.dumps(${metrics_unavailable_vms}, indent=4)    json
@@ -579,6 +581,7 @@ List Underutilized VMs Based on Memory Usage in resource group `${AZURE_RESOURCE
             ...    location=${vm.get('location', 'N/A')}
             ...    memory_percentage=${memory_percentage}
             ...    status=${vm.get('instanceView', {}).get('statuses', [{}])[0].get('code', 'Unknown')}
+            ...    vm_link=https://portal.azure.com/#@/resource${vm['id']}/overview
             ...    id=${vm.get('id', '')}
             
             Append To List    ${underutilized_vms}    ${vm_data}
@@ -594,7 +597,7 @@ List Underutilized VMs Based on Memory Usage in resource group `${AZURE_RESOURCE
             ...    location=${vm.get('location', 'N/A')}
             ...    vm_agent_status=${vm_agent_status.stdout}
             ...    vm_status=${vm_status.stdout}
-            
+            ...    vm_link=https://portal.azure.com/#@/resource${vm['id']}/overview
             Append To List    ${metrics_unavailable_vms}    ${vm_data}
         END
     END
@@ -607,12 +610,12 @@ List Underutilized VMs Based on Memory Usage in resource group `${AZURE_RESOURCE
         RW.CLI.Run Cli    cmd=echo '${vm_data_json.replace("'", "'\\''")}' > ${temp_file}
         
         ${formatted_results}=    RW.CLI.Run Cli
-        ...    cmd=cat ${temp_file} | jq -r '["VM Name", "Resource Group", "Location", "Memory Used %", "Status", "Link"], (.[] | [.name, .resource_group, .location, (if .memory_percentage == null then "N/A" else (.memory_percentage | tostring + "%") end), .status, ("https://portal.azure.com/#@/resource" + .id + "/overview")]) | @tsv' | column -t -s '\t' -o ' | '
+        ...    cmd=cat ${temp_file} | jq -r '["VM Name", "Resource Group", "Location", "Memory Used %", "Status"], (.[] | ["[" + .name + "](" + .vm_link + ")", .resource_group, .location, (if .memory_percentage == null then "N/A" else (.memory_percentage | tostring + "%") end), .status]) | @tsv' | column -t -s '\t' -o ' | '
         
         ${report}=    Set Variable    ${report}${formatted_results.stdout}
         RW.CLI.Run Cli    cmd=rm -f ${temp_file}
         
-        RW.Core.Add Pre To Report    ${report}
+        RW.Core.Add To Report    ${report}
         ${vms_json}=    Evaluate    json.dumps(${underutilized_vms}, indent=4)    json
         RW.Core.Add Issue
         ...    severity=4
@@ -633,7 +636,7 @@ List Underutilized VMs Based on Memory Usage in resource group `${AZURE_RESOURCE
             ${metrics_report}=    Set Variable    ${metrics_report}  - VM Status: ${vm['vm_status']}\n\n
         END
         
-        RW.Core.Add Pre To Report    ${metrics_report}
+        RW.Core.Add To Report    ${metrics_report}
         ${metrics_unavailable_json}=    Evaluate    json.dumps(${metrics_unavailable_vms}, indent=4)    json
         RW.Core.Add Issue
         ...    severity=2
