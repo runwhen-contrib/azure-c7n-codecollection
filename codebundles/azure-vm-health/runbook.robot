@@ -170,51 +170,106 @@ List VMs With High CPU Usage in resource group `${AZURE_RESOURCE_GROUP}`
         ${vm_list}=    Create List
     END
 
+    ${high_cpu_vms}=    Create List
+    ${metrics_unavailable_vms}=    Create List
+    
     IF    len(@{vm_list}) > 0
         FOR    ${vm}    IN    @{vm_list}
-            ${pretty_vm}=    Evaluate    pprint.pformat(${vm})    modules=pprint
-            ${resource_group}=    Set Variable    ${vm['resourceGroup'].lower()}
-            ${vm_name}=    Set Variable    ${vm['name']}
             ${json_str}=    Evaluate    json.dumps(${vm})    json
-            
-            # Check if metrics are available
             ${metrics_available}=    RW.CLI.Run Cli
             ...    cmd=echo '${json_str}' | jq -r '(."c7n:metrics" | to_entries | map(.value.measurement[0]) | first) != null'
-            
             ${metrics_available_clean}=    Strip String    ${metrics_available.stdout}
+            
             IF    "${metrics_available_clean}" == "true"
-                ${formatted_results}=    RW.CLI.Run Cli
-                ...    cmd=jq -r '["VM_Name", "Resource_Group", "Location", "CPU_Usage%", "VM_Status", "VM_Link"], (.[] | [ .name, (.resourceGroup | ascii_downcase), .location, (."c7n:metrics" | to_entries | map(.value.measurement[0]) | first // "N/A" | tonumber | (. * 100 | round / 100) | tostring), (.instanceView.statuses[0].code // "Unknown"), ("https://portal.azure.com/#@/resource" + .id + "/overview") ]) | @tsv' ${OUTPUT_DIR}/azure-c7n-vm-health/vm-cpu-usage/resources.json | column -t
-                RW.Core.Add Pre To Report    High CPU Usage VMs Summary:\n===================================\n${formatted_results.stdout}
-
                 ${cpu_percentage_result}=    RW.CLI.Run Cli
                 ...    cmd=echo '${json_str}' | jq -r '(."c7n:metrics" | to_entries | map(.value.measurement[0]) | first // "0")'
-                # Convert to a number for further processing
                 ${cpu_percentage}=    Convert To Number    ${cpu_percentage_result.stdout}    2
-                RW.Core.Add Issue
-                ...    severity=3
-                ...    expected=Azure VM `${vm_name}` should have CPU usage below `${cpu_percentage}%` in resource group `${resource_group}`
-                ...    actual=Azure VM `${vm_name}` has high CPU usage of `${cpu_percentage}%` in the last `${HIGH_CPU_TIMEFRAME}` hours in resource group `${resource_group}`
-                ...    title=High CPU Usage on Azure VM `${vm_name}` found in Resource Group `${resource_group}`
-                ...    reproduce_hint=${c7n_output.cmd}
-                ...    details=${pretty_vm}
-                ...    next_steps=Investigate high CPU usage and consider resizing the VM in resource group `${AZURE_RESOURCE_GROUP}`
-            ELSE
-                # Check VM agent status when metrics are not available
-                ${vm_agent_status}=    RW.CLI.Run Cli
-                ...    cmd=echo '${json_str}' | jq -r '(.instanceView.vmAgent.statuses[0].code // "Unknown")'
-                ${vm_status}=    RW.CLI.Run Cli
-                ...    cmd=echo '${json_str}' | jq -r '(.instanceView.statuses[0].code // "Unknown")'
                 
-                RW.Core.Add Issue
-                ...    severity=4
-                ...    expected=Azure VM `${vm_name}` should have available CPU metrics in resource group `${resource_group}`
-                ...    actual=CPU metrics are not available for VM `${vm_name}`. VM Agent Status: ${vm_agent_status.stdout}, VM Status: ${vm_status.stdout}
-                ...    title=CPU Metrics Unavailable for Azure VM `${vm_name}` in Resource Group `${resource_group}`
-                ...    reproduce_hint=${c7n_output.cmd}
-                ...    details=${pretty_vm}
-                ...    next_steps=Check VM diagnostics settings in resource group `${AZURE_RESOURCE_GROUP}`
+                ${vm_data}=    Create Dictionary
+                ...    name=${vm['name']}
+                ...    resource_group=${vm['resourceGroup']}
+                ...    location=${vm.get('location', 'N/A')}
+                ...    cpu_percentage=${cpu_percentage}
+                ...    vm_status=${vm['instanceView']['statuses'][0]['code'] if 'instanceView' in ${vm} and 'statuses' in ${vm['instanceView']} and len(${vm['instanceView']['statuses']}) > 0 else 'Unknown'}
+                ...    vm_link=https://portal.azure.com/#@/resource${vm['id']}/overview
+                
+                Append To List    ${high_cpu_vms}    ${vm_data}
+            ELSE
+                ${vm_data}=    Create Dictionary
+                ...    name=${vm['name']}
+                ...    resource_group=${vm['resourceGroup']}
+                ...    location=${vm.get('location', 'N/A')}
+                ...    vm_agent_status=${vm['instanceView']['vmAgent']['statuses'][0]['code'] if 'instanceView' in ${vm} and 'vmAgent' in ${vm['instanceView']} and 'statuses' in ${vm['instanceView']['vmAgent']} and len(${vm['instanceView']['vmAgent']['statuses']}) > 0 else 'Unknown'}
+                ...    vm_status=${vm['instanceView']['statuses'][0]['code'] if 'instanceView' in ${vm} and 'statuses' in ${vm['instanceView']} and len(${vm['instanceView']['statuses']}) > 0 else 'Unknown'}
+                ...    vm_link=https://portal.azure.com/#@/resource${vm['id']}/overview
+                
+                Append To List    ${metrics_unavailable_vms}    ${vm_data}
             END
+        END
+        
+        # Process VMs with high CPU usage
+        IF    ${high_cpu_vms.__len__()} > 0
+            ${report}=    Set Variable    \n=== VMs With High CPU Usage (Last ${HIGH_CPU_TIMEFRAME} hours) ===\n
+            # Create a temporary file for jq processing
+            ${temp_file}=    Set Variable    ${OUTPUT_DIR}/high_cpu_vms.json
+            ${vm_data_json}=    Evaluate    json.dumps(${high_cpu_vms})    json
+            RW.CLI.Run Cli    cmd=echo '${vm_data_json.replace("'", "'\\''")}' > ${temp_file}
+            
+            # Generate formatted table
+            ${formatted_results}=    RW.CLI.Run Cli
+            ...    cmd=jq -r '["VM Name", "Resource Group", "Location", "CPU Usage %", "Status", "Link"], (.[] | [.name, .resource_group, .location, .cpu_percentage, .vm_status, .vm_link]) | @tsv' ${temp_file} | column -t -s $'\t'
+            ${report}=    Set Variable    ${report}${formatted_results.stdout}
+            
+            RW.Core.Add Pre To Report    ${report}
+            
+            # Add single issue with JSON details
+            ${vms_json}=    Evaluate    json.dumps(${high_cpu_vms}, indent=4)    json
+            RW.Core.Add Issue
+            ...    severity=3
+            ...    expected=Azure VMs should have CPU usage below ${HIGH_CPU_PERCENTAGE}% in resource group `${AZURE_RESOURCE_GROUP}`
+            ...    actual=Found ${high_cpu_vms.__len__()} VMs with high CPU usage in resource group `${AZURE_RESOURCE_GROUP}`
+            ...    title=High CPU Usage Detected in Resource Group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    reproduce_hint=${c7n_output.cmd}
+            ...    details={"high_cpu_vms": ${vms_json}, "resource_group": "${AZURE_RESOURCE_GROUP}", "subscription_name": "${AZURE_SUBSCRIPTION_NAME}", "timeframe_hours": ${HIGH_CPU_TIMEFRAME}, "threshold_percentage": ${HIGH_CPU_PERCENTAGE}}
+            ...    next_steps=Investigate high CPU usage and consider optimizing or resizing the VMs in resource group `${AZURE_RESOURCE_GROUP}`
+            
+            # Clean up temporary file
+            RW.CLI.Run Cli    cmd=rm -f ${temp_file}
+        END
+        
+        # Process VMs with metrics unavailable
+        IF    ${metrics_unavailable_vms.__len__()} > 0
+            ${report}=    Set Variable    \n=== VMs With CPU Metrics Unavailable ===\n
+            # Create a temporary file for jq processing
+            ${temp_file}=    Set Variable    ${OUTPUT_DIR}/cpu_metrics_unavailable_vms.json
+            ${vm_data_json}=    Evaluate    json.dumps(${metrics_unavailable_vms})    json
+            RW.CLI.Run Cli    cmd=echo '${vm_data_json.replace("'", "'\\''")}' > ${temp_file}
+            
+            # Generate formatted table
+            ${formatted_results}=    RW.CLI.Run Cli
+            ...    cmd=jq -r '["VM Name", "Resource Group", "Location", "VM Agent Status", "VM Status", "Link"], (.[] | [.name, .resource_group, .location, .vm_agent_status, .vm_status, .vm_link]) | @tsv' ${temp_file} | column -t -s $'\t'
+            ${report}=    Set Variable    ${report}${formatted_results.stdout}
+            
+            RW.Core.Add Pre To Report    ${report}
+            
+            # Add single issue with JSON details
+            ${vms_json}=    Evaluate    json.dumps(${metrics_unavailable_vms}, indent=4)    json
+            RW.Core.Add Issue
+            ...    severity=2
+            ...    expected=Azure VMs should have CPU metrics available in resource group `${AZURE_RESOURCE_GROUP}`
+            ...    actual=CPU metrics are not available for ${metrics_unavailable_vms.__len__()} VMs in resource group `${AZURE_RESOURCE_GROUP}`
+            ...    title=CPU Metrics Unavailable for VMs in Resource Group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    reproduce_hint=${c7n_output.cmd}
+            ...    details={"vms_without_metrics": ${vms_json}, "resource_group": "${AZURE_RESOURCE_GROUP}", "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
+            ...    next_steps=Check VM diagnostics and monitoring configurations in resource group `${AZURE_RESOURCE_GROUP}`
+            
+            # Clean up temporary file
+            RW.CLI.Run Cli    cmd=rm -f ${temp_file}
+        END
+        
+        # If no VMs with high CPU usage or metrics unavailable
+        IF    ${high_cpu_vms.__len__()} == 0 and ${metrics_unavailable_vms.__len__()} == 0
+            RW.Core.Add Pre To Report    "No VMs with high CPU usage found in resource group `${AZURE_RESOURCE_GROUP}`"
         END
     ELSE
         RW.Core.Add Pre To Report    "No VMs with high CPU usage found in resource group `${AZURE_RESOURCE_GROUP}`"
