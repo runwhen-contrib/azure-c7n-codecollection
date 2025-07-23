@@ -46,9 +46,9 @@ List VMs Health in resource group `${AZURE_RESOURCE_GROUP}`
                 ...    severity=3
                 ...    expected=Azure VM `${vm_name}` should have health status of `Available` in resource group `${AZURE_RESOURCE_GROUP}`
                 ...    actual=Azure VM `${vm_name}` has health status of `${health_status}` in resource group `${AZURE_RESOURCE_GROUP}`
-                ...    title=Azure VM `${vm_name}` with Health Status of `${health_status}` found in Resource Group `${AZURE_RESOURCE_GROUP}`
+                ...    title=Azure VM `${vm_name}` with Health Status of `${health_status}` found in Resource Group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
                 ...    reproduce_hint=${output.cmd}
-                ...    details=${pretty_health}
+                ...    details={"details": ${pretty_health}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
                 ...    next_steps=Investigate the health status of the Azure VM in resource group `${AZURE_RESOURCE_GROUP}`
             END
         END
@@ -57,9 +57,9 @@ List VMs Health in resource group `${AZURE_RESOURCE_GROUP}`
         ...    severity=4
         ...    expected=Azure VM health should be enabled in resource group `${AZURE_RESOURCE_GROUP}`
         ...    actual=Azure VM health appears unavailable in resource group `${AZURE_RESOURCE_GROUP}`
-        ...    title=Azure resource health is unavailable for Azure VMs in resource group `${AZURE_RESOURCE_GROUP}`
+        ...    title=Azure resource health is unavailable for Azure VMs in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
         ...    reproduce_hint=${output.cmd}
-        ...    details=${health_list}
+        ...    details={"details": ${health_list}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
         ...    next_steps=Please escalate to the Azure service owner to enable provider Microsoft.ResourceHealth.
     END
 
@@ -96,9 +96,9 @@ List VMs With Public IP in resource group `${AZURE_RESOURCE_GROUP}`
             ...    severity=4
             ...    expected=Azure VM `${vm_name}` should not be publicly accessible in resource group `${resource_group}`
             ...    actual=Azure VM `${vm_name}` is publicly accessible in resource group `${resource_group}`
-            ...    title=Azure VM `${vm_name}` with Public IP Detected in Resource Group `${resource_group}`
+            ...    title=Azure VM `${vm_name}` with Public IP Detected in Resource Group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
             ...    reproduce_hint=${c7n_output.cmd}
-            ...    details=${pretty_vm}
+            ...    details={"details": ${pretty_vm}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
             ...    next_steps=Disable the public IP address from azure VM in resource group `${AZURE_RESOURCE_GROUP}`
         END
     ELSE
@@ -139,9 +139,9 @@ List Stopped VMs in resource group `${AZURE_RESOURCE_GROUP}`
             ...    severity=4
             ...    expected=Azure VM `${vm_name}` should be in use in resource group `${resource_group}`
             ...    actual=Azure VM `${vm_name}` is in stopped state more than `${STOPPED_VM_TIMEFRAME}` hours in resource group `${resource_group}`
-            ...    title=Stopped Azure VM `${vm_name}` found in Resource Group `${resource_group}`
+            ...    title=Stopped Azure VM `${vm_name}` found in Resource Group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
             ...    reproduce_hint=${c7n_output.cmd}
-            ...    details=${pretty_vm}
+            ...    details={"details": ${pretty_vm}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
             ...    next_steps=Delete the stopped azure vm if no longer needed to reduce costs in resource group `${AZURE_RESOURCE_GROUP}`
         END
     ELSE
