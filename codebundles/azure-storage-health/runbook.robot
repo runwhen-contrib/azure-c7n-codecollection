@@ -268,7 +268,7 @@ List Storage Account Misconfigurations in resource group `${AZURE_RESOURCE_GROUP
             ${acct_name}=    Set Variable    ${acct['name']}
             ${acct_url}=    Set Variable    ${acct.get('resource_url', 'N/A')}
             ${issues}=    Set Variable    ${acct.get('issues', [])}
-            ${acct_pretty}=    Evaluate    json.dumps(${acct.get('details', {})}, indent=2)
+            ${acct_pretty}=    Evaluate    json.dumps(${acct}, indent=2)
             
             # Skip if no issues
             IF    not ${issues}
@@ -310,7 +310,7 @@ List Storage Account Misconfigurations in resource group `${AZURE_RESOURCE_GROUP
             ...    title=Azure Storage Misconfiguration found in ${acct_name} in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
             ...    reproduce_hint=${misconfig_cmd.cmd}
             ...    next_steps=${combined_next_steps}
-            ...    details={ "details": ${acct_pretty}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
+            ...    details={ "storage_account": ${acct_pretty}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
         END
 
         # Calculate overall totals
