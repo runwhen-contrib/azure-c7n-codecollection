@@ -46,9 +46,9 @@ Check Azure Storage Resource Health in resource group `${AZURE_RESOURCE_GROUP}`
                 ...    severity=3
                 ...    expected=Azure storage account `${storage_name}` should have health status of `Available` in resource group `${AZURE_RESOURCE_GROUP}` 
                 ...    actual=Azure storage account `${storage_name}` has health status of `${health_status}` in resource group `${AZURE_RESOURCE_GROUP}` 
-                ...    title=Azure Storage Account `${storage_name}` with Health Status of `${health_status}` found in Resource Group `${AZURE_RESOURCE_GROUP}` 
+                ...    title=Azure Storage Account `${storage_name}` with Health Status of `${health_status}` found in Resource Group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
                 ...    reproduce_hint=${output.cmd}
-                ...    details=${pretty_health}
+                ...    details={ "details": ${pretty_health}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
                 ...    next_steps=Investigate the health status of the Azure Storage Account in resource group `${AZURE_RESOURCE_GROUP}` 
             END
         END
@@ -57,9 +57,9 @@ Check Azure Storage Resource Health in resource group `${AZURE_RESOURCE_GROUP}`
         ...    severity=4
         ...    expected=Azure Storage account health should be enabled in resource group `${AZURE_RESOURCE_GROUP}`
         ...    actual=Azure Storage account health appears unavailable in resource group `${AZURE_RESOURCE_GROUP}`
-        ...    title=Azure resource health is unavailable for Azure Storage account in resource group `${AZURE_RESOURCE_GROUP}`
+        ...    title=Azure resource health is unavailable for Azure Storage account in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
         ...    reproduce_hint=$${output.cmd}
-        ...    details=${health_list}
+        ...    details={ "details": ${health_list}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
         ...    next_steps=Please escalate to the Azure service owner to enable provider Microsoft.ResourceHealth.
     END
 
@@ -97,9 +97,9 @@ List Unused Azure Disks in resource group `${AZURE_RESOURCE_GROUP}`
             ...    severity=4
             ...    expected=Azure disk `${disk_name}` should be attached to a VM in resource group `${resource_group}` 
             ...    actual=Azure disk `${disk_name}` is not attached to any VM in resource group `${resource_group}` 
-            ...    title=Unused Azure Disk `${disk_name}` found in Resource Group `${resource_group}` 
+            ...    title=Unused Azure Disk `${disk_name}` found in Resource Group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
             ...    reproduce_hint=${c7n_output.cmd}
-            ...    details=${pretty_disk}
+            ...    details={ "details": ${pretty_disk}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
             ...    next_steps=Delete the unused disk to reduce storage costs in resource group `${resource_group}` 
         END
     ELSE
@@ -140,9 +140,9 @@ List Unused Azure Snapshots in resource group `${AZURE_RESOURCE_GROUP}`
             ...    severity=4
             ...    expected=Azure snapshot `${snapshot_name}` should be attached to a disk in resource group `${resource_group}` 
             ...    actual=Azure snapshot `${snapshot_name}` is not attached to any disk in resource group `${resource_group}` 
-            ...    title=Unused Azure Snapshot `${snapshot_name}` found in Resource Group `${resource_group}` 
+            ...    title=Unused Azure Snapshot `${snapshot_name}` found in Resource Group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
             ...    reproduce_hint=${c7n_output.cmd}
-            ...    details=${pretty_snapshot}
+            ...    details={ "details": ${pretty_snapshot}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
             ...    next_steps=Delete the unused snapshot to reduce storage costs in resource group `${resource_group}` 
         END
     ELSE
@@ -183,9 +183,9 @@ List Unused Azure Storage Accounts in resource group `${AZURE_RESOURCE_GROUP}`
             ...    severity=4
             ...    expected=Azure storage account `${storage_name}` should have transactions in resource group `${resource_group}` 
             ...    actual=Azure storage account `${storage_name}` has no transactions in the last `${UNUSED_STORAGE_ACCOUNT_TIMEFRAME}` hours in resource group `${resource_group}` 
-            ...    title=Unused Azure Storage Account `${storage_name}` found in Resource Group `${resource_group}` 
+            ...    title=Unused Azure Storage Account `${storage_name}` found in Resource Group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
             ...    reproduce_hint=${c7n_output.cmd}
-            ...    details=${pretty_storage}
+            ...    details={ "details": ${pretty_storage}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
             ...    next_steps=Delete the unused storage account to reduce storage costs in resource group `${resource_group}`
         END
     ELSE
@@ -230,8 +230,9 @@ List Storage Containers with Public Access in resource group `${AZURE_RESOURCE_G
             ...    severity=3
             ...    expected=Azure storage container `${container_name}` should have restricted public access in resource group `${resource_group}`
             ...    actual=Azure storage container `${container_name}` has public access level '${public_access}' (${access_description}) in resource group `${resource_group}`
-            ...    title=Public Accessible Azure Storage Container `${container_name}` found in Resource Group `${resource_group}`
+            ...    title=Public Accessible Azure Storage Container `${container_name}` found in Resource Group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
             ...    reproduce_hint=${c7n_output.cmd}
+            ...    details={ "details": ${pretty_container}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
             ...    next_steps=Restrict public access to the storage container to improve security in resource group `${resource_group}`.
         END
     ELSE
@@ -267,7 +268,7 @@ List Storage Account Misconfigurations in resource group `${AZURE_RESOURCE_GROUP
             ${acct_name}=    Set Variable    ${acct['name']}
             ${acct_url}=    Set Variable    ${acct.get('resource_url', 'N/A')}
             ${issues}=    Set Variable    ${acct.get('issues', [])}
-            ${acct_pretty}=    Evaluate    json.dumps(${acct.get('details', {})}, indent=2)
+            ${acct_pretty}=    Evaluate    json.dumps(${acct}, indent=2)
             
             # Skip if no issues
             IF    not ${issues}
@@ -306,10 +307,10 @@ List Storage Account Misconfigurations in resource group `${AZURE_RESOURCE_GROUP
             ...    severity=4
             ...    expected=Storage account `${acct_name}` should not have security misconfigurations in resource group `${AZURE_RESOURCE_GROUP}`
             ...    actual=Found ${issue_count} misconfiguration(s) in storage account `${acct_name}` in resource group `${AZURE_RESOURCE_GROUP}`
-            ...    title=Azure Storage Misconfiguration found in ${acct_name} in resource group `${AZURE_RESOURCE_GROUP}`
+            ...    title=Azure Storage Misconfiguration found in ${acct_name} in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
             ...    reproduce_hint=${misconfig_cmd.cmd}
             ...    next_steps=${combined_next_steps}
-            ...    details=${acct_pretty}
+            ...    details={ "storage_account": ${acct_pretty}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
         END
 
         # Calculate overall totals
@@ -402,8 +403,8 @@ List Storage Account Changes in resource group `${AZURE_RESOURCE_GROUP}`
                 ...    severity=${severity}
                 ...    expected=Storage account operations should be reviewed for security implications in resource group `${AZURE_RESOURCE_GROUP}`
                 ...    actual=${security_level.lower()} security operation detected: ${operation} by ${caller} at ${timestamp} on storage account `${stg_name}`
-                ...    title=Storage Account Change - ${security_level} Security: ${operation} on `${stg_name}` in Resource Group `${AZURE_RESOURCE_GROUP}`
-                ...    details=${enhanced_details}
+                ...    title=Storage Account Change - ${security_level} Security: ${operation} on `${stg_name}` in Resource Group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+                ...    details={ "details": ${enhanced_details}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
                 ...    reproduce_hint=${audit_cmd.cmd}
                 ...    next_steps=Review the operation for security implications. Reason: ${reason}
             END
@@ -447,8 +448,8 @@ List Storage Account Changes in resource group `${AZURE_RESOURCE_GROUP}`
                 ...    severity=4
                 ...    expected=Storage account operations should complete successfully in resource group `${AZURE_RESOURCE_GROUP}`
                 ...    actual=Failed operation detected: ${operation} by ${caller} at ${timestamp} on storage account `${stg_name}`
-                ...    title=Storage Account Failed Operation: ${operation} on `${stg_name}` in Resource Group `${AZURE_RESOURCE_GROUP}`
-                ...    details=${enhanced_details}
+                ...    title=Storage Account Failed Operation: ${operation} on `${stg_name}` in Resource Group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+                ...    details={ "details": ${enhanced_details}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
                 ...    reproduce_hint=${audit_cmd.cmd}
                 ...    next_steps=Investigate the failed operation. Reason: ${reason}
             END
@@ -477,6 +478,11 @@ Suite Initialization
     ...    description=The Azure Subscription ID for the resource.  
     ...    pattern=\w*
     ...    default=""
+    ${AZURE_SUBSCRIPTION_NAME}=    RW.Core.Import User Variable    AZURE_SUBSCRIPTION_NAME
+    ...    type=string
+    ...    description=The Azure Subscription Name for the resource.
+    ...    pattern=\w*
+    ...    default=""
     ${UNUSED_STORAGE_ACCOUNT_TIMEFRAME}=    RW.Core.Import User Variable    UNUSED_STORAGE_ACCOUNT_TIMEFRAME
     ...    type=string
     ...    description=The timeframe in hours to check for unused storage accounts (e.g., 720 for 30 days)
@@ -499,7 +505,7 @@ Suite Initialization
     Set Suite Variable    ${UNUSED_STORAGE_ACCOUNT_TIMEFRAME}    ${UNUSED_STORAGE_ACCOUNT_TIMEFRAME}
     Set Suite Variable    ${AZURE_ACTIVITY_LOG_LOOKBACK}    ${AZURE_ACTIVITY_LOG_LOOKBACK}
     Set Suite Variable    ${AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE}    ${AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE}
-    
+    Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${AZURE_SUBSCRIPTION_NAME}
     # Set Azure subscription context for Cloud Custodian
     RW.CLI.Run Cli
     ...    cmd=az account set --subscription ${AZURE_SUBSCRIPTION_ID}

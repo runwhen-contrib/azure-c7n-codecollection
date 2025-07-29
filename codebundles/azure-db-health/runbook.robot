@@ -73,9 +73,9 @@ List Database Availability in resource group `${AZURE_RESOURCE_GROUP}`
                 ...    severity=3
                 ...    expected=${display_name} `${db_name}` should have availability above 99.99% in resource group `${resource_group}`
                 ...    actual=${display_name} `${db_name}` has availability of ${availability}% in resource group `${resource_group}`
-                ...    title=Low Availability Detected on ${display_name} `${db_name}` in Resource Group `${resource_group}`
+                ...    title=Low Availability Detected on ${display_name} `${db_name}` in Resource Group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
                 ...    reproduce_hint=${c7n_output.cmd}
-                ...    details=${pretty_db}
+                ...    details={"details": ${pretty_db}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
                 ...    next_steps=Investigate and resolve the availability issues for the ${display_name} in resource group `${AZURE_RESOURCE_GROUP}`
             END
         ELSE
@@ -135,9 +135,9 @@ List Publicly Accessible Databases in resource group `${AZURE_RESOURCE_GROUP}`
                 ...    severity=4
                 ...    expected=${display_name} `${server_name}` should not have public network access enabled in resource group `${resource_group}`
                 ...    actual=${display_name} `${server_name}` has public network access enabled in resource group `${resource_group}`
-                ...    title=Publicly Accessible ${display_name} `${server_name}` Detected in Resource Group `${resource_group}`
+                ...    title=Publicly Accessible ${display_name} `${server_name}` Detected in Resource Group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
                 ...    reproduce_hint=${c7n_output.cmd}
-                ...    details=${pretty_server}
+                ...    details={"details": ${pretty_server}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
                 ...    next_steps=Disable public network access for the ${display_name} in resource group `${AZURE_RESOURCE_GROUP}`
             END
         ELSE
@@ -197,9 +197,9 @@ List Databases Without Replication in resource group `${AZURE_RESOURCE_GROUP}`
                 ...    severity=4
                 ...    expected=${display_name} `${db_name}` should have replication configured in resource group `${resource_group}`
                 ...    actual=${display_name} `${db_name}` has no replication configured in resource group `${resource_group}`
-                ...    title=${display_name} `${db_name}` Without Replication Detected in Resource Group `${resource_group}`
+                ...    title=${display_name} `${db_name}` Without Replication Detected in Resource Group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
                 ...    reproduce_hint=${c7n_output.cmd}
-                ...    details=${pretty_db}
+                ...    details={"details": ${pretty_db}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
                 ...    next_steps=Configure replication for the ${display_name} in resource group `${AZURE_RESOURCE_GROUP}`
             END
         ELSE
@@ -257,9 +257,9 @@ List Databases Without High Availability in resource group `${AZURE_RESOURCE_GRO
                 ...    severity=4
                 ...    expected=${display_name} `${db_name}` should have high availability enabled in resource group `${resource_group}`
                 ...    actual=${display_name} `${db_name}` has high availability disabled in resource group `${resource_group}`
-                ...    title=${display_name} `${db_name}` Without High Availability Detected in Resource Group `${resource_group}`
+                ...    title=${display_name} `${db_name}` Without High Availability Detected in Resource Group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
                 ...    reproduce_hint=${c7n_output.cmd}
-                ...    details=${pretty_db}
+                ...    details={"details": ${pretty_db}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
                 ...    next_steps=Enable high availability for the ${display_name} in resource group `${AZURE_RESOURCE_GROUP}`
             END
         ELSE
@@ -322,9 +322,9 @@ List Databases With High CPU Usage in resource group `${AZURE_RESOURCE_GROUP}`
                 ...    severity=3
                 ...    expected=${display_name} `${db_name}` should have CPU usage below ${HIGH_CPU_PERCENTAGE}% in resource group `${resource_group}`
                 ...    actual=${display_name} `${db_name}` has CPU usage of ${cpu_usage}% in resource group `${resource_group}`
-                ...    title=High CPU Usage Detected on ${display_name} `${db_name}` in Resource Group `${resource_group}`
+                ...    title=High CPU Usage Detected on ${display_name} `${db_name}` in Resource Group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
                 ...    reproduce_hint=${c7n_output.cmd}
-                ...    details=${pretty_db}
+                ...    details={"details": ${pretty_db}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
                 ...    next_steps=Increase the CPU cores for the ${display_name} in resource group `${AZURE_RESOURCE_GROUP}`
             END
         ELSE
@@ -387,9 +387,9 @@ List All Databases With High Memory Usage in resource group `${AZURE_RESOURCE_GR
                 ...    severity=3
                 ...    expected=${display_name} `${server_name}` should have memory usage below ${HIGH_MEMORY_PERCENTAGE}% in resource group `${resource_group}`
                 ...    actual=${display_name} `${server_name}` has memory usage of ${memory_usage}% in resource group `${resource_group}`
-                ...    title=High Memory Usage Detected on ${display_name} `${server_name}` in Resource Group `${resource_group}`
+                ...    title=High Memory Usage Detected on ${display_name} `${server_name}` in Resource Group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
                 ...    reproduce_hint=${c7n_output.cmd}
-                ...    details=${pretty_server}
+                ...    details={"details": ${pretty_server}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
                 ...    next_steps=Investigate and optimize the ${display_name}'s memory usage in resource group `${AZURE_RESOURCE_GROUP}`
             END
         ELSE
@@ -452,9 +452,9 @@ List Redis Caches With High Cache Miss Rate in resource group `${AZURE_RESOURCE_
             ...    severity=4
             ...    expected=${display_name} `${cache_name}` should have low cache miss rate in resource group `${resource_group}`
             ...    actual=${display_name} `${cache_name}` has cache miss rate of ${cache_miss_rate}% in resource group `${resource_group}`
-            ...    title=High Cache Miss Rate Detected on ${display_name} `${cache_name}` in Resource Group `${resource_group}`
+            ...    title=High Cache Miss Rate Detected on ${display_name} `${cache_name}` in Resource Group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
             ...    reproduce_hint=${c7n_output.cmd}
-            ...    details=${pretty_cache}
+            ...    details={"details": ${pretty_cache}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
             ...    next_steps=Investigate and optimize the ${display_name}'s cache configuration in resource group `${AZURE_RESOURCE_GROUP}`
         END
     ELSE
@@ -518,8 +518,8 @@ List Database Resource Health in resource group `${AZURE_RESOURCE_GROUP}`
             ...    severity=3
             ...    expected=${display_name} `${db_name}` should be available in resource group `${resource_group}`
             ...    actual=${display_name} `${db_name}` is in ${status} state in resource group `${resource_group}`
-            ...    title=Unhealthy Database Detected: ${display_name} `${db_name}` in Resource Group `${resource_group}`
-            ...    details=${pretty_db}
+            ...    title=Unhealthy Database Detected: ${display_name} `${db_name}` in Resource Group `${resource_group}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    details={"details": ${pretty_db}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
             ...    reproduce_hint=${script_result.cmd}
             ...    next_steps=Investigate the database health issue in Azure Portal: https://portal.azure.com/#@/resource${db['id']}/overview
         END
@@ -611,8 +611,8 @@ List Database Changes in resource group `${AZURE_RESOURCE_GROUP}`
                 ...    severity=4
                 ...    expected=Changes to ${display_name} `${db_name}` should be reviewed in resource group `${AZURE_RESOURCE_GROUP}`
                 ...    actual=Recent change detected: ${operation} by ${caller} at ${timestamp}
-                ...    title=Recent Database Change: ${operation} on ${display_name} `${db_name}` in Resource Group `${AZURE_RESOURCE_GROUP}`
-                ...    details=${pretty_change}
+                ...    title=Recent Database Change: ${operation} on ${display_name} `${db_name}` in Resource Group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+                ...    details={"details": ${pretty_change}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
                 ...    reproduce_hint=${output.cmd}
                 ...    next_steps=Review the recent change in Azure Portal: ${resource_url}
             END
@@ -639,6 +639,10 @@ Suite Initialization
     ${AZURE_RESOURCE_GROUP}=    RW.Core.Import User Variable    AZURE_RESOURCE_GROUP
     ...    type=string
     ...    description=Azure resource group.
+    ...    pattern=\w*
+    ${AZURE_SUBSCRIPTION_NAME}=    RW.Core.Import User Variable    AZURE_SUBSCRIPTION_NAME
+    ...    type=string
+    ...    description=Azure subscription name.
     ...    pattern=\w*
     ${HIGH_CPU_PERCENTAGE}=    RW.Core.Import User Variable    HIGH_CPU_PERCENTAGE
     ...    type=string
@@ -740,7 +744,7 @@ Suite Initialization
     Set Suite Variable    ${LOW_AVAILABILITY_INTERVAL}    ${LOW_AVAILABILITY_INTERVAL}
     Set Suite Variable    ${AZURE_ACTIVITY_LOG_LOOKBACK}    ${AZURE_ACTIVITY_LOG_LOOKBACK}
     Set Suite Variable    ${AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE}    ${AZURE_ACTIVITY_LOG_LOOKBACK_FOR_ISSUE}
-    
+    Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${AZURE_SUBSCRIPTION_NAME}
     # Set Azure subscription context for Cloud Custodian
     RW.CLI.Run Cli
     ...    cmd=az account set --subscription ${AZURE_SUBSCRIPTION_ID}
