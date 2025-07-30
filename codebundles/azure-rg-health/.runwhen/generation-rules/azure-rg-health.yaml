@@ -1,0 +1,22 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: azure
+  generationRules:
+    - resourceTypes:
+        - resource_group
+      matchRules:
+        - type: pattern
+          pattern: ".+"  # Match all resource groups
+          properties: [name]
+          mode: substring
+      slxs:
+        - baseName: az-rg-health
+          qualifiers: ["subscription_id"]
+          baseTemplateName: azure-rg-health
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: azure-rg-health-taskset.yaml
