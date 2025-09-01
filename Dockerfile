@@ -14,6 +14,9 @@ COPY --chown=runwhen:0 . .
 # Check and install requirements if requirements.txt exists
 RUN if [ -f "requirements.txt" ]; then pip install --no-cache-dir -r requirements.txt; else echo "requirements.txt not found, skipping pip install"; fi
 
+# Install Databricks CLI
+RUN curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh
+
 # Install additional user packages
 #RUN apt-get update && \
 #    apt-get install -y --no-install-recommends net-tools && \
