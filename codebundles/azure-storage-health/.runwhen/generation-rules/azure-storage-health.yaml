@@ -14,7 +14,7 @@ spec:
           mode: substring
       slxs:
         - baseName: azure-storage-health
-          qualifiers: [resource, resource_group]
+          qualifiers: [resource, resource_group, subscription_id]
           baseTemplateName: azure-storage-health
           levelOfDetail: basic
           outputItems:
