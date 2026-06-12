@@ -50,6 +50,7 @@ List VMs Health in resource group `${AZURE_RESOURCE_GROUP}`
                 ...    reproduce_hint=${output.cmd}
                 ...    details={"details": ${pretty_health}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
                 ...    next_steps=Investigate the health status of the Azure VM in resource group `${AZURE_RESOURCE_GROUP}`
+                ...    summary=The Azure VM `${vm_name}` in resource group `${AZURE_RESOURCE_GROUP}` was reported with a health status of `${health_status}`, although it was expected to show `Available`. Resource Health data indicates no platform issues, suggesting the VM may have been intentionally or unexpectedly removed. Further investigation into its health status was initiated and the issue was resolved by listing VM health in `${AZURE_RESOURCE_GROUP}`.
             END
         END
     ELSE
@@ -61,6 +62,7 @@ List VMs Health in resource group `${AZURE_RESOURCE_GROUP}`
         ...    reproduce_hint=${output.cmd}
         ...    details={"details": ${health_list}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
         ...    next_steps=Please escalate to the Azure service owner to enable provider Microsoft.ResourceHealth.
+        ...    summary=Azure VM health was expected to be available for resources in `${AZURE_RESOURCE_GROUP}`, but it appeared unavailable within the `${AZURE_SUBSCRIPTION_NAME}` subscription.
     END
 
 List VMs With Public IP in resource group `${AZURE_RESOURCE_GROUP}`
@@ -100,6 +102,7 @@ List VMs With Public IP in resource group `${AZURE_RESOURCE_GROUP}`
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details={"details": ${pretty_vm}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
             ...    next_steps=Disable the public IP address from azure VM in resource group `${AZURE_RESOURCE_GROUP}`
+            ...    summary=Azure VM `${vm_name}` in resource group `${resource_group}` was found to be publicly accessible, which violates the expectation that it should not expose a public IP. This configuration could allow unintended external access to the VM. Actions are needed to remove its public exposure and review related network and access configurations.
         END
     ELSE
         RW.Core.Add Pre To Report    "No VMs with public IPs found in resource group `${AZURE_RESOURCE_GROUP}`"
@@ -143,6 +146,7 @@ List Stopped VMs in resource group `${AZURE_RESOURCE_GROUP}`
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details={"details": ${pretty_vm}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
             ...    next_steps=Delete the stopped azure vm if no longer needed to reduce costs in resource group `${AZURE_RESOURCE_GROUP}`
+            ...    summary=The Azure VM `${vm_name}` in resource group `${resource_group}` was found in a deallocated state despite being expected to remain in use. Provisioning succeeded, but the VM has remained stopped for over `${STOPPED_VM_TIMEFRAME}` hours, indicating it is not actively needed. Action is required to determine whether the VM should be retained or removed to avoid unnecessary costs.
         END
     ELSE
         RW.Core.Add Pre To Report    "No stopped VMs found in resource group `${AZURE_RESOURCE_GROUP}`"
@@ -224,6 +228,8 @@ List VMs With High CPU Usage in resource group `${AZURE_RESOURCE_GROUP}`
             
             # Add single issue with JSON details
             ${vms_json}=    Evaluate    json.dumps(${high_cpu_vms}, indent=4)    json
+            ${vms_names_list}=    Evaluate    ["`" + vm['name'] + "`" for vm in ${vms_json}]
+            ${vms_names}=    Evaluate    ", ".join(${vms_names_list})    modules=string
             RW.Core.Add Issue
             ...    severity=3
             ...    expected=Azure VMs should have CPU usage below ${HIGH_CPU_PERCENTAGE}% in resource group `${AZURE_RESOURCE_GROUP}`
@@ -232,6 +238,7 @@ List VMs With High CPU Usage in resource group `${AZURE_RESOURCE_GROUP}`
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details={"high_cpu_vms": ${vms_json}, "resource_group": "${AZURE_RESOURCE_GROUP}", "subscription_name": "${AZURE_SUBSCRIPTION_NAME}", "timeframe_hours": ${HIGH_CPU_TIMEFRAME}, "threshold_percentage": ${HIGH_CPU_PERCENTAGE}}
             ...    next_steps=Investigate high CPU usage and consider optimizing or resizing the VMs in resource group `${AZURE_RESOURCE_GROUP}`
+            ...    summary=The issue identified ${high_cpu_vms.__len__()} VMs in the `${AZURE_RESOURCE_GROUP}` resource group within the `${AZURE_SUBSCRIPTION_NAME}` subscription exhibiting higher-than-expected CPU usage. Azure VMs were expected to maintain optimal utilization, but ${vms_names} showed elevated CPU usage over the past ${HIGH_CPU_TIMEFRAME} hours. Further action is needed to ensure CPU efficiency and assess whether configuration or workload adjustments are required.
             
             # Clean up temporary file
             RW.CLI.Run Cli    cmd=rm -f ${temp_file}
@@ -254,6 +261,8 @@ List VMs With High CPU Usage in resource group `${AZURE_RESOURCE_GROUP}`
             
             # Add single issue with JSON details
             ${vms_json}=    Evaluate    json.dumps(${metrics_unavailable_vms}, indent=4)    json
+            ${vms_names_list}=    Evaluate    ["`" + vm['name'] + "`" for vm in ${vms_json}]
+            ${vms_names}=    Evaluate    ", ".join(${vms_names_list})    modules=string
             RW.Core.Add Issue
             ...    severity=2
             ...    expected=Azure VMs should have CPU metrics available in resource group `${AZURE_RESOURCE_GROUP}`
@@ -262,7 +271,7 @@ List VMs With High CPU Usage in resource group `${AZURE_RESOURCE_GROUP}`
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details={"vms_without_metrics": ${vms_json}, "resource_group": "${AZURE_RESOURCE_GROUP}", "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
             ...    next_steps=Check VM diagnostics and monitoring configurations in resource group `${AZURE_RESOURCE_GROUP}`
-            
+            ...    summary=CPU metrics were missing for ${metrics_unavailable_vms.__len__()} Azure VMs in the `${AZURE_RESOURCE_GROUP}` resource group. This indicates a gap in monitoring or diagnostics configuration that requires corrective action to restore proper metric collection for ${vms_names}.
             # Clean up temporary file
             RW.CLI.Run Cli    cmd=rm -f ${temp_file}
         END
@@ -363,7 +372,8 @@ List Underutilized VMs Based on CPU Usage in resource group `${AZURE_RESOURCE_GR
         
         # Convert VMs to JSON for details
         ${vms_json}=    Evaluate    json.dumps(${underutilized_vms}, indent=4)    json
-        
+        ${vms_names_list}=    Evaluate    ["`" + vm['name'] + "`" for vm in ${vms_json}]
+        ${vms_names}=    Evaluate    ", ".join(${vms_names_list})    modules=string
         RW.Core.Add Issue
         ...    severity=4
         ...    expected=Azure VMs should have adequate CPU utilization in resource group `${AZURE_RESOURCE_GROUP}`
@@ -372,6 +382,7 @@ List Underutilized VMs Based on CPU Usage in resource group `${AZURE_RESOURCE_GR
         ...    reproduce_hint=${c7n_output.cmd}
         ...    details={"underutilized_vms": ${vms_json}, "resource_group": "${AZURE_RESOURCE_GROUP}", "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
         ...    next_steps=Consider downsizing or optimizing the VMs listed above to reduce costs
+        ...    summary=The issue identified that the virtual machines ${vms_names} in resource group `${AZURE_RESOURCE_GROUP}` under subscription `${AZURE_SUBSCRIPTION_NAME}` showed significantly low CPU utilization compared to expected levels. This indicates the VMs are underutilized and may not be appropriately sized for their workloads. Actions are needed to reassess their configurations and determine if downsizing or workload adjustments are appropriate.
     END
 
     # Report VMs with metrics unavailable if any
@@ -387,7 +398,8 @@ List Underutilized VMs Based on CPU Usage in resource group `${AZURE_RESOURCE_GR
         
         # Convert metrics unavailable VMs to JSON for details
         ${metrics_unavailable_json}=    Evaluate    json.dumps(${metrics_unavailable_vms}, indent=4)    json
-        
+        ${vms_names_list}=    Evaluate    ["`" + vm['name'] + "`" for vm in ${metrics_unavailable_json}]
+        ${vms_names}=    Evaluate    ", ".join(${vms_names_list})    modules=string
         RW.Core.Add Issue
         ...    severity=2
         ...    expected=All VMs should have CPU metrics collection enabled
@@ -396,6 +408,7 @@ List Underutilized VMs Based on CPU Usage in resource group `${AZURE_RESOURCE_GR
         ...    reproduce_hint=${c7n_output.cmd}
         ...    details={"vms_without_cpu_metrics": ${metrics_unavailable_json}, "resource_group": "${AZURE_RESOURCE_GROUP}", "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
         ...    next_steps=Check VM diagnostics and agent status for the VMs listed above
+        ...    summary=CPU metrics were missing for ${metrics_unavailable_vms.__len__()} Azure VMs in the `${AZURE_RESOURCE_GROUP}` resource group. This indicates a gap in monitoring or diagnostics configuration that requires corrective action to restore proper metric collection for ${vms_names}.
     END
 
     # If no issues found
@@ -481,6 +494,8 @@ List VMs With High Memory Usage in resource group `${AZURE_RESOURCE_GROUP}`
             
             # Add single issue with JSON details
             ${vms_json}=    Evaluate    json.dumps(${high_memory_vms}, indent=4)    json
+            ${vms_names_list}=    Evaluate    ["`" + vm['name'] + "`" for vm in ${vms_json}]
+            ${vms_names}=    Evaluate    ", ".join(${vms_names_list})    modules=string
             RW.Core.Add Issue
             ...    severity=3
             ...    expected=Azure VMs should have optimal memory utilization in resource group `${AZURE_RESOURCE_GROUP}`
@@ -489,6 +504,7 @@ List VMs With High Memory Usage in resource group `${AZURE_RESOURCE_GROUP}`
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details={"high_memory_vms": ${vms_json}, "resource_group": "${AZURE_RESOURCE_GROUP}", "subscription_name": "${AZURE_SUBSCRIPTION_NAME}", "timeframe_hours": ${HIGH_MEMORY_TIMEFRAME}}
             ...    next_steps=Consider resizing the VMs to a larger SKU or optimizing memory usage in resource group `${AZURE_RESOURCE_GROUP}`
+            ...    summary=The issue identified ${high_memory_vms.__len__()} VMs in the `${AZURE_RESOURCE_GROUP}` resource group within the `${AZURE_SUBSCRIPTION_NAME}` subscription exhibiting higher-than-expected memory usage. Azure VMs were expected to maintain optimal utilization, but ${vms_names} showed elevated memory consumption over the past ${HIGH_MEMORY_TIMEFRAME} hours. Further action is needed to ensure memory efficiency and assess whether configuration or workload adjustments are required.
             
             # Clean up temporary file
             RW.CLI.Run Cli    cmd=rm -f ${temp_file}
@@ -511,6 +527,8 @@ List VMs With High Memory Usage in resource group `${AZURE_RESOURCE_GROUP}`
             
             # Add single issue with JSON details
             ${vms_json}=    Evaluate    json.dumps(${metrics_unavailable_vms}, indent=4)    json
+            ${vms_names_list}=    Evaluate    ["`" + vm['name'] + "`" for vm in ${vms_json}]
+            ${vms_names}=    Evaluate    ", ".join(${vms_names_list})    modules=string
             RW.Core.Add Issue
             ...    severity=2
             ...    expected=Azure VMs should have memory metrics available in resource group `${AZURE_RESOURCE_GROUP}`
@@ -519,6 +537,7 @@ List VMs With High Memory Usage in resource group `${AZURE_RESOURCE_GROUP}`
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details={"vms_without_metrics": ${vms_json}, "resource_group": "${AZURE_RESOURCE_GROUP}", "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
             ...    next_steps=Check VM diagnostics and monitoring configurations in resource group `${AZURE_RESOURCE_GROUP}`
+            ...    summary=Memory metrics were missing for ${metrics_unavailable_vms.__len__()} Azure VMs in the `${AZURE_RESOURCE_GROUP}` resource group. This indicates a gap in monitoring or diagnostics configuration that requires corrective action to restore proper metric collection for ${vms_names}.
             
             # Clean up temporary file
             RW.CLI.Run Cli    cmd=rm -f ${temp_file}
@@ -617,6 +636,8 @@ List Underutilized VMs Based on Memory Usage in resource group `${AZURE_RESOURCE
         
         RW.Core.Add To Report    ${report}
         ${vms_json}=    Evaluate    json.dumps(${underutilized_vms}, indent=4)    json
+        ${vms_names_list}=    Evaluate    ["`" + vm['name'] + "`" for vm in ${vms_json}]
+        ${vms_names}=    Evaluate    ", ".join(${vms_names_list})    modules=string
         RW.Core.Add Issue
         ...    severity=4
         ...    expected=Azure VMs should have optimal memory utilization in resource group `${resource_group}`
@@ -625,6 +646,7 @@ List Underutilized VMs Based on Memory Usage in resource group `${AZURE_RESOURCE
         ...    reproduce_hint=${c7n_output.cmd}
         ...    details={"underutilized_vms": ${vms_json}, "resource_group": "${AZURE_RESOURCE_GROUP}", "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
         ...    next_steps=Consider downsizing or optimizing the VMs listed above to reduce costs
+        ...    summary=The issue identified ${underutilized_vms.__len__()} Azure VMs in the `${AZURE_RESOURCE_GROUP}` resource group within the `${AZURE_SUBSCRIPTION_NAME}` subscription exhibiting significantly low memory utilization compared to expected levels. Azure VMs were expected to maintain optimal utilization, but ${vms_names} showed low memory consumption over the past ${LOW_MEMORY_TIMEFRAME} hours. Further action is needed to ensure memory efficiency and assess whether configuration or workload adjustments are required.
     END
 
     # Report VMs with metrics unavailable if any
@@ -638,6 +660,8 @@ List Underutilized VMs Based on Memory Usage in resource group `${AZURE_RESOURCE
         
         RW.Core.Add To Report    ${metrics_report}
         ${metrics_unavailable_json}=    Evaluate    json.dumps(${metrics_unavailable_vms}, indent=4)    json
+        ${vms_names_list}=    Evaluate    ["`" + vm['name'] + "`" for vm in ${metrics_unavailable_json}]
+        ${vms_names}=    Evaluate    ", ".join(${vms_names_list})    modules=string
         RW.Core.Add Issue
         ...    severity=2
         ...    expected=All VMs should have metrics collection enabled
@@ -646,6 +670,7 @@ List Underutilized VMs Based on Memory Usage in resource group `${AZURE_RESOURCE
         ...    reproduce_hint=${c7n_output.cmd}
         ...    details={"metrics_unavailable_vms": ${metrics_unavailable_json}, "resource_group": "${AZURE_RESOURCE_GROUP}", "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
         ...    next_steps=Check VM diagnostics and agent status for the VMs listed above
+        ...    summary=Memory metrics were missing for ${metrics_unavailable_vms.__len__()} Azure VMs in the `${AZURE_RESOURCE_GROUP}` resource group. This indicates a gap in monitoring or diagnostics configuration that requires corrective action to restore proper metric collection for ${vms_names}.
     END
 
     # If no issues found
@@ -690,6 +715,7 @@ List Unused Network Interfaces in resource group `${AZURE_RESOURCE_GROUP}`
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details=${pretty_nic}
             ...    next_steps=Delete the unused network interface to reduce costs in resource group `${AZURE_RESOURCE_GROUP}`
+            ...    summary=Network Interface `${nic_name}` in resource group `${resource_group}` was not attached to any virtual machine, although it was expected to be in use. This unused state indicates a misalignment between expected configuration and actual deployment. Action is needed to remove the unused interface to prevent unnecessary resource costs.
         END
     ELSE
         RW.Core.Add Pre To Report    "No unused network interfaces found in resource group `${AZURE_RESOURCE_GROUP}`"
@@ -732,6 +758,7 @@ List Unused Public IPs in resource group `${AZURE_RESOURCE_GROUP}`
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details=${pretty_ip}
             ...    next_steps=Delete the unused public IP to reduce costs in resource group `${AZURE_RESOURCE_GROUP}`
+            ...    summary=Public IP `${ip_name}` is not attached to any resource in resource group `${resource_group}`, which violates the expectation that it should be attached to a resource or removed if unused. Keeping unused public IPs can incur unnecessary costs and may lead to accidental exposure if later attached without proper review.
         END
     ELSE
         RW.Core.Add Pre To Report    "No unused public IPs found in resource group `${AZURE_RESOURCE_GROUP}`"
@@ -777,6 +804,7 @@ List VMs Agent Status in resource group `${AZURE_RESOURCE_GROUP}`
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details=${pretty_vm}
             ...    next_steps=Check VM agent logs on the VM in resource group `${AZURE_RESOURCE_GROUP}`
+            ...    summary=The Azure VM `${vm_name}` in resource group `${resource_group}` reported an unresponsive VM agent despite the VM provisioning and power states being healthy. The VM was expected to have a functioning agent but instead returned a `${vm_agent_status}` status. Further action is required to determine why the VM agent is not responding.
         END
     ELSE
         RW.Core.Add Pre To Report    "No VMs with VM agent status issues found in resource group `${AZURE_RESOURCE_GROUP}`"
