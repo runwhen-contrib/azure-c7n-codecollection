@@ -35,12 +35,14 @@ Check Azure Storage Resource Health in resource group `${AZURE_RESOURCE_GROUP}`
         Log    Failed to load JSON payload, defaulting to empty list.    WARN
         ${health_list}=    Create List
     END
+    ${timestamp}=    DateTime.Get Current Date
     IF    $health_list
 
         FOR    ${health}    IN    @{health_list}
             ${pretty_health}=    Evaluate    pprint.pformat(${health})    modules=pprint
             ${storage_name}=    Set Variable    ${health['resourceName']}
             ${health_status}=    Set Variable    ${health['properties']['availabilityState']}
+            ${timestamp}=    Set Variable    ${health['properties']['occuredTime']}
             IF    "${health_status}" != "Available"
                 RW.Core.Add Issue
                 ...    severity=3
@@ -50,6 +52,7 @@ Check Azure Storage Resource Health in resource group `${AZURE_RESOURCE_GROUP}`
                 ...    reproduce_hint=${output.cmd}
                 ...    details={ "details": ${pretty_health}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
                 ...    next_steps=Investigate the health status of the Azure Storage Account in resource group `${AZURE_RESOURCE_GROUP}` 
+                ...    observed_at=${timestamp}
             END
         END
     ELSE
@@ -61,6 +64,7 @@ Check Azure Storage Resource Health in resource group `${AZURE_RESOURCE_GROUP}`
         ...    reproduce_hint=$${output.cmd}
         ...    details={ "details": ${health_list}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
         ...    next_steps=Please escalate to the Azure service owner to enable provider Microsoft.ResourceHealth.
+        ...    observed_at=${timestamp}
     END
 
 List Unused Azure Disks in resource group `${AZURE_RESOURCE_GROUP}`
@@ -75,6 +79,7 @@ List Unused Azure Disks in resource group `${AZURE_RESOURCE_GROUP}`
     ...    timeout_seconds=180
     ${report_data}=    RW.CLI.Run Cli
     ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-disk-triage/unused-disk/resources.json
+    ${timestamp}=    DateTime.Get Current Date
 
     TRY
         ${disk_list}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
@@ -101,6 +106,7 @@ List Unused Azure Disks in resource group `${AZURE_RESOURCE_GROUP}`
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details={ "details": ${pretty_disk}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
             ...    next_steps=Delete the unused disk to reduce storage costs in resource group `${resource_group}` 
+            ...    observed_at=${timestamp}
         END
     ELSE
         RW.Core.Add Pre To Report    "No unused disks found in resource group `${AZURE_RESOURCE_GROUP}`"
@@ -118,6 +124,7 @@ List Unused Azure Snapshots in resource group `${AZURE_RESOURCE_GROUP}`
     ...    timeout_seconds=180
     ${report_data}=    RW.CLI.Run Cli
     ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-snapshot-triage/unused-snapshot/resources.json
+    ${timestamp}=    DateTime.Get Current Date
 
     TRY
         ${snapshot_list}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
@@ -144,6 +151,7 @@ List Unused Azure Snapshots in resource group `${AZURE_RESOURCE_GROUP}`
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details={ "details": ${pretty_snapshot}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
             ...    next_steps=Delete the unused snapshot to reduce storage costs in resource group `${resource_group}` 
+            ...    observed_at=${timestamp}
         END
     ELSE
         RW.Core.Add Pre To Report    "No unused snapshots found in resource group `${AZURE_RESOURCE_GROUP}`"
@@ -162,6 +170,7 @@ List Unused Azure Storage Accounts in resource group `${AZURE_RESOURCE_GROUP}`
     ...    timeout_seconds=180
     ${report_data}=    RW.CLI.Run Cli
     ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-storage-triage/unused-storage-account/resources.json
+    ${timestamp}=    DateTime.Get Current Date
 
     TRY
         ${storage_list}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
@@ -187,6 +196,7 @@ List Unused Azure Storage Accounts in resource group `${AZURE_RESOURCE_GROUP}`
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details={ "details": ${pretty_storage}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
             ...    next_steps=Delete the unused storage account to reduce storage costs in resource group `${resource_group}`
+            ...    observed_at=${timestamp}
         END
     ELSE
         RW.Core.Add Pre To Report    "No unused storage accounts found in resource group `${AZURE_RESOURCE_GROUP}`"
@@ -204,6 +214,7 @@ List Storage Containers with Public Access in resource group `${AZURE_RESOURCE_G
     ...    timeout_seconds=180
     ${report_data}=    RW.CLI.Run Cli
     ...    cmd=cat azure-c7n-storage-containers-public-access/storage-container-public/resources.json
+    ${timestamp}=    DateTime.Get Current Date
     TRY
         ${container_list}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
     EXCEPT
@@ -234,6 +245,7 @@ List Storage Containers with Public Access in resource group `${AZURE_RESOURCE_G
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details={ "details": ${pretty_container}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
             ...    next_steps=Restrict public access to the storage container to improve security in resource group `${resource_group}`.
+            ...    observed_at=${timestamp}
         END
     ELSE
         RW.Core.Add Pre To Report    "No public accessible storage containers found in resource group `${AZURE_RESOURCE_GROUP}`"
@@ -253,6 +265,7 @@ List Storage Account Misconfigurations in resource group `${AZURE_RESOURCE_GROUP
     ${log_file}=    Set Variable    storage_misconfig.json
     ${misconfig_output}=    RW.CLI.Run Cli
     ...    cmd=cat ${log_file}
+    ${timestamp}=    DateTime.Get Current Date
     # Load JSON results.  If the file is missing or malformed, report an issue and abort.
     TRY
         ${data}=    Evaluate    json.loads('''${misconfig_output.stdout}''')    json
@@ -311,6 +324,7 @@ List Storage Account Misconfigurations in resource group `${AZURE_RESOURCE_GROUP
             ...    reproduce_hint=${misconfig_cmd.cmd}
             ...    next_steps=${combined_next_steps}
             ...    details={ "storage_account": ${acct_pretty}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
+            ...    observed_at=${timestamp}
         END
 
         # Calculate overall totals
@@ -407,6 +421,7 @@ List Storage Account Changes in resource group `${AZURE_RESOURCE_GROUP}`
                 ...    details={ "details": ${enhanced_details}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
                 ...    reproduce_hint=${audit_cmd.cmd}
                 ...    next_steps=Review the operation for security implications. Reason: ${reason}
+                ...    observed_at=${timestamp}
             END
         END
     ELSE
@@ -452,6 +467,7 @@ List Storage Account Changes in resource group `${AZURE_RESOURCE_GROUP}`
                 ...    details={ "details": ${enhanced_details}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
                 ...    reproduce_hint=${audit_cmd.cmd}
                 ...    next_steps=Investigate the failed operation. Reason: ${reason}
+                ...    observed_at=${timestamp}
             END
         END
     ELSE
