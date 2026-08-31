@@ -12,6 +12,7 @@ Library             RW.CLI
 Library             RW.platform
 Library             Collections
 Library    CloudCustodian.Core
+Library    DateTime
 
 Suite Setup         Suite Initialization
 
@@ -29,6 +30,7 @@ List VMs Health in resource group `${AZURE_RESOURCE_GROUP}`
     ...    show_in_rwl_cheatsheet=true
     ${report_data}=    RW.CLI.Run Cli
     ...    cmd=cat vm_health.json
+    ${timestamp}=    DateTime.Get Current Date
     TRY
         ${health_list}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
     EXCEPT
@@ -41,6 +43,7 @@ List VMs Health in resource group `${AZURE_RESOURCE_GROUP}`
             ${pretty_health}=    Evaluate    pprint.pformat(${health})    modules=pprint
             ${vm_name}=    Set Variable    ${health['resourceName']}
             ${health_status}=    Set Variable    ${health['properties']['availabilityState']}
+            ${timestamp}=    Set Variable    ${health['properties']['occuredTime']}
             IF    "${health_status}" != "Available"
                 RW.Core.Add Issue
                 ...    severity=3
@@ -50,6 +53,7 @@ List VMs Health in resource group `${AZURE_RESOURCE_GROUP}`
                 ...    reproduce_hint=${output.cmd}
                 ...    details={"details": ${pretty_health}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
                 ...    next_steps=Investigate the health status of the Azure VM in resource group `${AZURE_RESOURCE_GROUP}`
+                ...    observed_at=${timestamp}
             END
         END
     ELSE
@@ -61,6 +65,7 @@ List VMs Health in resource group `${AZURE_RESOURCE_GROUP}`
         ...    reproduce_hint=${output.cmd}
         ...    details={"details": ${health_list}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
         ...    next_steps=Please escalate to the Azure service owner to enable provider Microsoft.ResourceHealth.
+        ...    observed_at=${timestamp}
     END
 
 List VMs With Public IP in resource group `${AZURE_RESOURCE_GROUP}`
@@ -75,6 +80,7 @@ List VMs With Public IP in resource group `${AZURE_RESOURCE_GROUP}`
     ...    timeout_seconds=180
     ${report_data}=    RW.CLI.Run Cli
     ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-health/vm-with-public-ip/resources.json
+    ${timestamp}=    DateTime.Get Current Date
 
     TRY
         ${vm_list}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
@@ -100,6 +106,7 @@ List VMs With Public IP in resource group `${AZURE_RESOURCE_GROUP}`
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details={"details": ${pretty_vm}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
             ...    next_steps=Disable the public IP address from azure VM in resource group `${AZURE_RESOURCE_GROUP}`
+            ...    observed_at=${timestamp}
         END
     ELSE
         RW.Core.Add Pre To Report    "No VMs with public IPs found in resource group `${AZURE_RESOURCE_GROUP}`"
@@ -118,6 +125,7 @@ List Stopped VMs in resource group `${AZURE_RESOURCE_GROUP}`
     ...    timeout_seconds=180
     ${report_data}=    RW.CLI.Run Cli
     ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-health/stopped-vms/resources.json
+    ${timestamp}=    DateTime.Get Current Date
 
     TRY
         ${vm_list}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
@@ -143,6 +151,7 @@ List Stopped VMs in resource group `${AZURE_RESOURCE_GROUP}`
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details={"details": ${pretty_vm}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
             ...    next_steps=Delete the stopped azure vm if no longer needed to reduce costs in resource group `${AZURE_RESOURCE_GROUP}`
+            ...    observed_at=${timestamp}
         END
     ELSE
         RW.Core.Add Pre To Report    "No stopped VMs found in resource group `${AZURE_RESOURCE_GROUP}`"
@@ -162,6 +171,7 @@ List VMs With High CPU Usage in resource group `${AZURE_RESOURCE_GROUP}`
     ...    timeout_seconds=180
     ${report_data}=    RW.CLI.Run Cli
     ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-health/vm-cpu-usage/resources.json
+    ${timestamp}=    DateTime.Get Current Date
 
     TRY
         ${vm_list}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
@@ -232,6 +242,7 @@ List VMs With High CPU Usage in resource group `${AZURE_RESOURCE_GROUP}`
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details={"high_cpu_vms": ${vms_json}, "resource_group": "${AZURE_RESOURCE_GROUP}", "subscription_name": "${AZURE_SUBSCRIPTION_NAME}", "timeframe_hours": ${HIGH_CPU_TIMEFRAME}, "threshold_percentage": ${HIGH_CPU_PERCENTAGE}}
             ...    next_steps=Investigate high CPU usage and consider optimizing or resizing the VMs in resource group `${AZURE_RESOURCE_GROUP}`
+            ...    observed_at=${timestamp}
             
             # Clean up temporary file
             RW.CLI.Run Cli    cmd=rm -f ${temp_file}
@@ -262,6 +273,7 @@ List VMs With High CPU Usage in resource group `${AZURE_RESOURCE_GROUP}`
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details={"vms_without_metrics": ${vms_json}, "resource_group": "${AZURE_RESOURCE_GROUP}", "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
             ...    next_steps=Check VM diagnostics and monitoring configurations in resource group `${AZURE_RESOURCE_GROUP}`
+            ...    observed_at=${timestamp}
             
             # Clean up temporary file
             RW.CLI.Run Cli    cmd=rm -f ${temp_file}
@@ -289,6 +301,7 @@ List Underutilized VMs Based on CPU Usage in resource group `${AZURE_RESOURCE_GR
     ...    timeout_seconds=180
     ${report_data}=    RW.CLI.Run Cli
     ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-health/under-utilized-vm-cpu-usage/resources.json
+    ${timestamp}=    DateTime.Get Current Date
 
     TRY
         ${vm_list}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
@@ -372,6 +385,7 @@ List Underutilized VMs Based on CPU Usage in resource group `${AZURE_RESOURCE_GR
         ...    reproduce_hint=${c7n_output.cmd}
         ...    details={"underutilized_vms": ${vms_json}, "resource_group": "${AZURE_RESOURCE_GROUP}", "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
         ...    next_steps=Consider downsizing or optimizing the VMs listed above to reduce costs
+        ...    observed_at=${timestamp}
     END
 
     # Report VMs with metrics unavailable if any
@@ -396,6 +410,7 @@ List Underutilized VMs Based on CPU Usage in resource group `${AZURE_RESOURCE_GR
         ...    reproduce_hint=${c7n_output.cmd}
         ...    details={"vms_without_cpu_metrics": ${metrics_unavailable_json}, "resource_group": "${AZURE_RESOURCE_GROUP}", "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
         ...    next_steps=Check VM diagnostics and agent status for the VMs listed above
+        ...    observed_at=${timestamp}
     END
 
     # If no issues found
@@ -418,6 +433,7 @@ List VMs With High Memory Usage in resource group `${AZURE_RESOURCE_GROUP}`
     ...    timeout_seconds=180
     ${report_data}=    RW.CLI.Run Cli
     ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-health/vm-memory-usage/resources.json
+    ${timestamp}=    DateTime.Get Current Date
 
     TRY
         ${vm_list}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
@@ -489,7 +505,7 @@ List VMs With High Memory Usage in resource group `${AZURE_RESOURCE_GROUP}`
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details={"high_memory_vms": ${vms_json}, "resource_group": "${AZURE_RESOURCE_GROUP}", "subscription_name": "${AZURE_SUBSCRIPTION_NAME}", "timeframe_hours": ${HIGH_MEMORY_TIMEFRAME}}
             ...    next_steps=Consider resizing the VMs to a larger SKU or optimizing memory usage in resource group `${AZURE_RESOURCE_GROUP}`
-            
+            ...    observed_at=${timestamp}
             # Clean up temporary file
             RW.CLI.Run Cli    cmd=rm -f ${temp_file}
         END
@@ -519,7 +535,7 @@ List VMs With High Memory Usage in resource group `${AZURE_RESOURCE_GROUP}`
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details={"vms_without_metrics": ${vms_json}, "resource_group": "${AZURE_RESOURCE_GROUP}", "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
             ...    next_steps=Check VM diagnostics and monitoring configurations in resource group `${AZURE_RESOURCE_GROUP}`
-            
+            ...    observed_at=${timestamp}
             # Clean up temporary file
             RW.CLI.Run Cli    cmd=rm -f ${temp_file}
         END
@@ -547,6 +563,7 @@ List Underutilized VMs Based on Memory Usage in resource group `${AZURE_RESOURCE
     ...    timeout_seconds=180
     ${report_data}=    RW.CLI.Run Cli
     ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-health/vm-memory-usage/resources.json
+    ${timestamp}=    DateTime.Get Current Date
 
     TRY
         ${vm_list}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
@@ -625,6 +642,7 @@ List Underutilized VMs Based on Memory Usage in resource group `${AZURE_RESOURCE
         ...    reproduce_hint=${c7n_output.cmd}
         ...    details={"underutilized_vms": ${vms_json}, "resource_group": "${AZURE_RESOURCE_GROUP}", "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
         ...    next_steps=Consider downsizing or optimizing the VMs listed above to reduce costs
+        ...    observed_at=${timestamp}
     END
 
     # Report VMs with metrics unavailable if any
@@ -646,6 +664,7 @@ List Underutilized VMs Based on Memory Usage in resource group `${AZURE_RESOURCE
         ...    reproduce_hint=${c7n_output.cmd}
         ...    details={"metrics_unavailable_vms": ${metrics_unavailable_json}, "resource_group": "${AZURE_RESOURCE_GROUP}", "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
         ...    next_steps=Check VM diagnostics and agent status for the VMs listed above
+        ...    observed_at=${timestamp}
     END
 
     # If no issues found
@@ -665,6 +684,7 @@ List Unused Network Interfaces in resource group `${AZURE_RESOURCE_GROUP}`
     ...    timeout_seconds=180
     ${report_data}=    RW.CLI.Run Cli
     ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-health/unused-nic/resources.json
+    ${timestamp}=    DateTime.Get Current Date
 
     TRY
         ${nic_list}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
@@ -690,6 +710,7 @@ List Unused Network Interfaces in resource group `${AZURE_RESOURCE_GROUP}`
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details=${pretty_nic}
             ...    next_steps=Delete the unused network interface to reduce costs in resource group `${AZURE_RESOURCE_GROUP}`
+            ...    observed_at=${timestamp}
         END
     ELSE
         RW.Core.Add Pre To Report    "No unused network interfaces found in resource group `${AZURE_RESOURCE_GROUP}`"
@@ -707,6 +728,7 @@ List Unused Public IPs in resource group `${AZURE_RESOURCE_GROUP}`
     ...    timeout_seconds=180
     ${report_data}=    RW.CLI.Run Cli
     ...    cmd=cat ${OUTPUT_DIR}/azure-c7n-vm-health/unused-publicip/resources.json
+    ${timestamp}=    DateTime.Get Current Date
 
     TRY
         ${ip_list}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
@@ -732,6 +754,7 @@ List Unused Public IPs in resource group `${AZURE_RESOURCE_GROUP}`
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details=${pretty_ip}
             ...    next_steps=Delete the unused public IP to reduce costs in resource group `${AZURE_RESOURCE_GROUP}`
+            ...    observed_at=${timestamp}
         END
     ELSE
         RW.Core.Add Pre To Report    "No unused public IPs found in resource group `${AZURE_RESOURCE_GROUP}`"
@@ -769,6 +792,11 @@ List VMs Agent Status in resource group `${AZURE_RESOURCE_GROUP}`
             ${resource_group}=    Set Variable    ${vm['resourceGroup'].lower()}
             ${vm_name}=    Set Variable    ${vm['name']}
             ${vm_agent_status}=    Set Variable    ${vm['instanceView']['vmAgent']['statuses'][0]['code']}
+            TRY
+                ${timestamp}=    Set Variable    ${vm['instanceView']['vmAgent']['statuses'][0]['time']}
+            EXCEPT
+                ${timestamp}=    DateTime.Get Current Date
+            END
             RW.Core.Add Issue
             ...    severity=3
             ...    expected=Azure VM `${vm_name}` should have a healthy VM agent status in resource group `${resource_group}`
@@ -777,6 +805,7 @@ List VMs Agent Status in resource group `${AZURE_RESOURCE_GROUP}`
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details=${pretty_vm}
             ...    next_steps=Check VM agent logs on the VM in resource group `${AZURE_RESOURCE_GROUP}`
+            ...    observed_at=${timestamp}
         END
     ELSE
         RW.Core.Add Pre To Report    "No VMs with VM agent status issues found in resource group `${AZURE_RESOURCE_GROUP}`"

@@ -22,6 +22,7 @@ List Database Availability in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Lists databases that have availability below 100%
     [Tags]    Database    Azure    Availability    access:read-only
     ${db_map}=    Evaluate    json.load(open('db-map.json'))    json
+    ${timestamp}=    DateTime.Get Current Date
     
     FOR    ${db_type}    IN    @{db_map.keys()}
         ${db_info}=    Set Variable    ${db_map['${db_type}']}
@@ -77,6 +78,7 @@ List Database Availability in resource group `${AZURE_RESOURCE_GROUP}`
                 ...    reproduce_hint=${c7n_output.cmd}
                 ...    details={"details": ${pretty_db}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
                 ...    next_steps=Investigate and resolve the availability issues for the ${display_name} in resource group `${AZURE_RESOURCE_GROUP}`
+                ...    observed_at=${timestamp}
             END
         ELSE
             RW.Core.Add Pre To Report    "No ${display_name} with low availability found in resource group `${AZURE_RESOURCE_GROUP}`"
@@ -88,7 +90,8 @@ List Publicly Accessible Databases in resource group `${AZURE_RESOURCE_GROUP}`
     [Tags]    Database    Azure    Security    access:read-only
     
     ${db_map}=    Evaluate    json.load(open('${CURDIR}/db-map.json'))    json
-    
+    ${timestamp}=    DateTime.Get Current Date
+
     FOR    ${db_type}    IN    @{db_map.keys()}
         ${db_info}=    Set Variable    ${db_map['${db_type}']}
         Continue For Loop If    'publicnetworkaccess' not in ${db_info}
@@ -139,6 +142,7 @@ List Publicly Accessible Databases in resource group `${AZURE_RESOURCE_GROUP}`
                 ...    reproduce_hint=${c7n_output.cmd}
                 ...    details={"details": ${pretty_server}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
                 ...    next_steps=Disable public network access for the ${display_name} in resource group `${AZURE_RESOURCE_GROUP}`
+                ...    observed_at=${timestamp}
             END
         ELSE
             RW.Core.Add Pre To Report    "No publicly accessible ${display_name} found in resource group `${AZURE_RESOURCE_GROUP}`"
@@ -151,6 +155,7 @@ List Databases Without Replication in resource group `${AZURE_RESOURCE_GROUP}`
     [Tags]    Database    Azure    Replication    access:read-only
     
     ${db_types}=    Evaluate    json.load(open('${CURDIR}/db-map.json'))    json
+    ${timestamp}=    DateTime.Get Current Date
     FOR    ${db_type}    IN    @{db_types.keys()}
         ${replication_config}=    Set Variable    ${db_types["${db_type}"].get("replication", {})}
         IF    not ${replication_config}    CONTINUE
@@ -201,6 +206,7 @@ List Databases Without Replication in resource group `${AZURE_RESOURCE_GROUP}`
                 ...    reproduce_hint=${c7n_output.cmd}
                 ...    details={"details": ${pretty_db}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
                 ...    next_steps=Configure replication for the ${display_name} in resource group `${AZURE_RESOURCE_GROUP}`
+                ...    observed_at=${timestamp}
             END
         ELSE
             RW.Core.Add Pre To Report    "No ${display_name} without replication configured found in resource group `${AZURE_RESOURCE_GROUP}`"
@@ -213,6 +219,7 @@ List Databases Without High Availability in resource group `${AZURE_RESOURCE_GRO
     [Tags]    Database    Azure    HighAvailability    access:read-only
     
     ${db_types}=    Evaluate    json.load(open('${CURDIR}/db-map.json'))    json
+    ${timestamp}=    DateTime.Get Current Date
     FOR    ${db_type}    IN    @{db_types.keys()}
         ${ha_config}=    Set Variable    ${db_types["${db_type}"].get("ha", {})}
         IF    not ${ha_config}    CONTINUE
@@ -261,6 +268,7 @@ List Databases Without High Availability in resource group `${AZURE_RESOURCE_GRO
                 ...    reproduce_hint=${c7n_output.cmd}
                 ...    details={"details": ${pretty_db}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
                 ...    next_steps=Enable high availability for the ${display_name} in resource group `${AZURE_RESOURCE_GROUP}`
+                ...    observed_at=${timestamp}
             END
         ELSE
             RW.Core.Add Pre To Report    "No ${display_name} without high availability found in resource group `${AZURE_RESOURCE_GROUP}`"
@@ -272,6 +280,7 @@ List Databases With High CPU Usage in resource group `${AZURE_RESOURCE_GROUP}`
     [Tags]    Database    Azure    CPU    access:read-only
     
     ${db_types}=    Evaluate    json.load(open('${CURDIR}/db-map.json'))    json
+    ${timestamp}=    DateTime.Get Current Date
     FOR    ${db_type}    IN    @{db_types.keys()}
         Continue For Loop If    "cpu_metric" not in ${db_types["${db_type}"]}
         
@@ -326,6 +335,7 @@ List Databases With High CPU Usage in resource group `${AZURE_RESOURCE_GROUP}`
                 ...    reproduce_hint=${c7n_output.cmd}
                 ...    details={"details": ${pretty_db}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
                 ...    next_steps=Increase the CPU cores for the ${display_name} in resource group `${AZURE_RESOURCE_GROUP}`
+                ...    observed_at=${timestamp}
             END
         ELSE
             RW.Core.Add Pre To Report    "No ${display_name} with high CPU usage found in resource group `${AZURE_RESOURCE_GROUP}`"
@@ -338,6 +348,7 @@ List All Databases With High Memory Usage in resource group `${AZURE_RESOURCE_GR
     [Tags]    Database    Azure    Memory    access:read-only
     
     ${db_map}=    Evaluate    json.load(open('${CURDIR}/db-map.json'))    json
+    ${timestamp}=    DateTime.Get Current Date
     FOR    ${db_type}    IN    @{db_map.keys()}
         Continue For Loop If    "cpu_metric" not in ${db_map["${db_type}"]}
         ${resource}=    Set Variable    ${db_map["${db_type}"]["resource"]}
@@ -391,6 +402,7 @@ List All Databases With High Memory Usage in resource group `${AZURE_RESOURCE_GR
                 ...    reproduce_hint=${c7n_output.cmd}
                 ...    details={"details": ${pretty_server}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
                 ...    next_steps=Investigate and optimize the ${display_name}'s memory usage in resource group `${AZURE_RESOURCE_GROUP}`
+                ...    observed_at=${timestamp}
             END
         ELSE
             RW.Core.Add Pre To Report    "No ${display_name} with high memory usage found in resource group `${AZURE_RESOURCE_GROUP}`"
@@ -405,6 +417,7 @@ List Redis Caches With High Cache Miss Rate in resource group `${AZURE_RESOURCE_
     ${policy_name}=    Set Variable    redis-cache-miss
     ${resource}=    Set Variable    azure.redis
     ${display_name}=    Set Variable    Redis Cache
+    ${timestamp}=    DateTime.Get Current Date
     
     CloudCustodian.Core.Generate Policy   
     ...    ${CURDIR}/redis-cache-miss.j2
@@ -456,6 +469,7 @@ List Redis Caches With High Cache Miss Rate in resource group `${AZURE_RESOURCE_
             ...    reproduce_hint=${c7n_output.cmd}
             ...    details={"details": ${pretty_cache}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
             ...    next_steps=Investigate and optimize the ${display_name}'s cache configuration in resource group `${AZURE_RESOURCE_GROUP}`
+            ...    observed_at=${timestamp}
         END
     ELSE
         RW.Core.Add Pre To Report    "No ${display_name} with high cache miss rate found in resource group `${AZURE_RESOURCE_GROUP}`"
@@ -514,6 +528,7 @@ List Database Resource Health in resource group `${AZURE_RESOURCE_GROUP}`
             ${db_name}=    Set Variable    ${db['dbName']}
             ${display_name}=    Set Variable    ${db['displayName']}
             ${status}=    Set Variable    ${db['properties']['availabilityState']}
+            ${timestamp}=    Set Variable    ${db['properties']['occuredTime']}
             RW.Core.Add Issue
             ...    severity=3
             ...    expected=${display_name} `${db_name}` should be available in resource group `${resource_group}`
@@ -522,6 +537,7 @@ List Database Resource Health in resource group `${AZURE_RESOURCE_GROUP}`
             ...    details={"details": ${pretty_db}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
             ...    reproduce_hint=${script_result.cmd}
             ...    next_steps=Investigate the database health issue in Azure Portal: https://portal.azure.com/#@/resource${db['id']}/overview
+            ...    observed_at=${timestamp}
         END
         
         # Clean up temporary file
@@ -615,6 +631,7 @@ List Database Changes in resource group `${AZURE_RESOURCE_GROUP}`
                 ...    details={"details": ${pretty_change}, "subscription_name": "${AZURE_SUBSCRIPTION_NAME}"}
                 ...    reproduce_hint=${output.cmd}
                 ...    next_steps=Review the recent change in Azure Portal: ${resource_url}
+                ...    observed_at=${timestamp}
             END
         END
     ELSE
